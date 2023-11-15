@@ -1,26 +1,26 @@
-# TACT template project
+# ton-third
 
-This project has ready to use TACT compiler, typescript + jest with [tact-emulator](https://github.com/tact-lang/tact-emulator), example how to do tests.
+## Project structure
 
-```bash
-yarn test # To test contract
-yarn build # To build contract
-yarn deploy # To deploy contract
-```
-## Deployment
+-   `contracts` - source code of all the smart contracts of the project and their dependencies.
+-   `wrappers` - wrapper classes (implementing `Contract` from ton-core) for the contracts, including any [de]serialization primitives and compilation functions.
+-   `tests` - tests for the contracts.
+-   `scripts` - scripts used by the project, mainly the deployment scripts.
 
-To deploy contract you should:
+## How to use
 
-1) Specify `contract.tact` that will be used as entry point of your contract
-2) Configure `contract.deploy.ts` according to your `contract.tact` to generate a deployment link. In particular, it is necessary to correctly call the Init() function from the contract.
+### Build
 
-If you renamed `contract.tact` to something else, you need to update `tact.config.json` correspondingly. For more information , see [Tact Documentation](https://docs.tact-lang.org/language/guides/config)
-## Testing
+`npx blueprint build` or `yarn blueprint build`
 
-Example of contract tests are in `contract.spec.ts`. For more information about testing, see [Tact Documentation](https://docs.tact-lang.org/language/guides/debug)
+### Test
 
-To add new test files to contract you should create `*.spec.ts` files similar to template's one and they would be automatically included in testing.
+`npx blueprint test` or `yarn blueprint test`
 
-## Licence
+### Deploy or run another script
 
-MIT
+`npx blueprint run` or `yarn blueprint run`
+
+### Add a new contract
+
+`npx blueprint create ContractName` or `yarn blueprint create ContractName`
