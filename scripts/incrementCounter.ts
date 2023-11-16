@@ -16,6 +16,8 @@ export async function run(provider: NetworkProvider, args: string[]) {
 
     const counterBefore = await counter.getCounter();
 
+    ui.write('Counter before upgrade ' + counterBefore);
+
     await counter.send(
         provider.sender(),
         {
@@ -40,5 +42,5 @@ export async function run(provider: NetworkProvider, args: string[]) {
     }
 
     ui.clearActionPrompt();
-    ui.write('Counter increased successfully!');
+    ui.write('Counter increased successfully to ' + counterAfter);
 }
