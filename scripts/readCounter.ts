@@ -1,5 +1,5 @@
 import { Address, toNano } from 'ton-core';
-import { Counter } from '../wrappers/Counter';
+import { Counter } from '../_sullof/Counter';
 import { NetworkProvider, sleep } from '@ton-community/blueprint';
 
 export async function run(provider: NetworkProvider, args: string[]) {
@@ -17,5 +17,4 @@ export async function run(provider: NetworkProvider, args: string[]) {
     const counterBefore = await counter.getCounter();
 
     ui.write('Counter value: ' + counterBefore);
-
 }

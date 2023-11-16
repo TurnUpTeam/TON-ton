@@ -1,6 +1,6 @@
 import { Blockchain, SandboxContract } from '@ton-community/sandbox';
 import { toNano } from 'ton-core';
-import { Counter } from '../wrappers/Counter';
+import { Counter } from '../_sullof/Counter';
 import '@ton-community/test-utils';
 
 describe('Counter', () => {

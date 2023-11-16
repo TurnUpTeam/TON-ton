@@ -1,11 +1,11 @@
 import { toNano } from 'ton-core';
-import { Counter } from '../_sullof/Counter';
+import { Shares } from '../wrappers/Shares';
 import { NetworkProvider } from '@ton-community/blueprint';
 
 export async function run(provider: NetworkProvider) {
-    const counter = provider.open(await Counter.fromInit(BigInt(Math.floor(Math.random() * 10000))));
+    const shares = provider.open(await Shares.fromInit());
 
-    await counter.send(
+    await shares.send(
         provider.sender(),
         {
             value: toNano('0.05'),
@@ -16,7 +16,7 @@ export async function run(provider: NetworkProvider) {
         }
     );
 
-    await provider.waitForDeploy(counter.address);
+    await provider.waitForDeploy(shares.address);
 
-    console.log('ID', await counter.getId());
+    // run methods on `shares`
 }
