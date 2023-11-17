@@ -26,7 +26,7 @@ struct Balance {
     balance: map<Address, Int as uint32>;
 }
 
-contract Shares with Deployable {
+contract SharesChild with Deployable {
     admin: Address;
     feeDestination: Address;
     protocolFeePercentage: Int as uint16;
@@ -115,8 +115,14 @@ contract Shares with Deployable {
     }
 
     get fun getPrice(supply: Int, amount: Int): Int {
-        let sum1: Int = ((supply - 1) * (supply) * (2 * (supply - 1) + 1)) / 6;
-        let sum2: Int = ((supply + amount - 1) * (supply + amount) * (2 * (supply + amount - 1) + 1)) / 6;
+        let sum1: Int = 0;
+        if (supply != 0) {
+            sum1 = ((supply - 1) * (supply) * (2 * (supply - 1) + 1)) / 6;
+        }
+        let sum2: Int = 0;
+        if (supply != 0 || amount != 1) {
+            sum2 = ((supply + amount - 1) * (supply + amount) * (2 * (supply + amount - 1) + 1)) / 6;
+        }
         return (sum1 + sum2) * ONE_ETHER / DIV_FACTOR;
     }
 
