@@ -5,6 +5,16 @@ message UpdateBalance {
     incr: Bool;
 }
 
+message GetBalance {
+    amount: Int as uint16;
+}
+
+message Balance {
+    owner: Address;
+    balance: Int as uint16;
+    amount: Int as uint16;
+}
+
 contract SharesWallet with Deployable {
     subject: Address;
     owner: Address;
@@ -30,6 +40,16 @@ contract SharesWallet with Deployable {
         }
     }
 
+    receive(msg: GetBalance) {
+        require(sender() == self.keysContract, "Forbidden");
+        self.reply(
+            Balance{
+                owner: self.owner,
+                balance: self.balance,
+                amount: msg.amount
+            }.toCell()
+        );
+    }
 
 }
 
