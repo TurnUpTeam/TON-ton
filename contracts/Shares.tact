@@ -1,5 +1,8 @@
 import "@stdlib/deploy";
 
+import "./SharesWallet";
+import "./SharesKey";
+
 const ONE_ETHER: Int = 1000000000000000000;
 const DIV_FACTOR: Int = 2000;
 
@@ -7,96 +10,74 @@ message UpdateFeeDestination {
     feeDestination: Address;
 }
 
+message UpdateAdmin {
+    newAdmin: Address;
+}
+
 message UpdateFeePercentages {
     protocolFeePercentage: Int as uint16;
     subjectFeePercentage: Int as uint16;
 }
 
-message BuyShares {
-    sharesSubject: Address;
-    amount: Int as uint32;
-}
-
-message SellShares {
-    sharesSubject: Address;
-    amount: Int as uint32;
-}
-
-struct Balance {
-    balance: map<Address, Int as uint32>;
+message NewKey {
+    subject: Address;
+    initialSupply: Int as uint16;
 }
 
 contract Shares with Deployable {
     admin: Address;
     feeDestination: Address;
-    protocolFeePercentage: Int as uint16;
-    subjectFeePercentage: Int as uint16;
+    protocolFeePercentage: Int as uint16 = 0;
+    subjectFeePercentage: Int as uint16 = 0;
+    totalSupply: Int as uint32 = 0;
 
-    sharesSupply: map<Address, Int as uint32>;
-    sharesBalance: map<Address, Balance>;
-    singleBalance: map<Address, Int as uint32>;
+    key_content: Cell;
 
-    init(admin: Address, feeDestination: Address, protocolFeePercentage: Int, subjectFeePercentage: Int) {
-        self.admin = admin;
-        self.feeDestination = feeDestination;
-        self.protocolFeePercentage = protocolFeePercentage;
-        self.subjectFeePercentage = subjectFeePercentage;
+    init(key_content: Cell) {
+        self.admin = sender();
+        self.feeDestination = sender();
+        self.key_content = key_content;
+    }
+
+    receive(msg: NewKey) {
+        let ctx: Context = context();
+        require(msg.subject == ctx.sender, "Invalid sender");
+        let initCode: StateInit = self.calculate_sharesKey_init(msg.subject);
+        send(SendParameters{
+            to: contractAddress(initCode),
+            value: 0,
+            bounce: true,
+            mode: SendRemainingValue + SendIgnoreErrors,
+            body: FirstKeys{
+                owner: msg.subject,
+                initialSupply: msg.initialSupply
+            }.toCell(),
+            code: initCode.code,
+            data: initCode.data
+        });
+    }
+
+    inline fun calculate_sharesKey_init(owner_address: Address): StateInit {
+        return initOf SharesKey(owner_address, myAddress());
+    }
+
+    receive(msg: UpdateAdmin) {
+        require(self.admin == sender(), "Invalid sender");
+        self.admin = msg.newAdmin;
     }
 
     receive(msg: UpdateFeeDestination) {
-        let ctx: Context = context();
-        require(self.admin == ctx.sender, "Invalid sender");
+        require(self.admin == sender(), "Invalid sender");
         self.feeDestination = msg.feeDestination;
     }
 
     receive(msg: UpdateFeePercentages) {
-        let ctx: Context = context();
-        require(self.admin == ctx.sender, "Invalid sender");
+        require(self.admin == sender(), "Invalid sender");
         self.protocolFeePercentage = msg.protocolFeePercentage;
         self.subjectFeePercentage = msg.subjectFeePercentage;
     }
 
     receive() {}
-
-    receive(msg: BuyShares) {
-        let ctx: Context = context();
-        let supply: Int = 0;
-        if (self.sharesSupply.get(msg.sharesSubject) != null) {
-            supply = (self.sharesSupply.get(msg.sharesSubject))!!;
-        }
-        require(supply > 0 || msg.sharesSubject == ctx.sender, "Only the keys' owner can buy the first key");
-        let price: Int = self.getPrice(supply, msg.amount);
-        let protocolFee: Int = price * self.protocolFeePercentage / ONE_ETHER;
-        let subjectFee: Int = price * self.subjectFeePercentage / ONE_ETHER;
-        let funds: Int = ctx.value;
-        require(funds >= price + protocolFee + subjectFee, "Insufficient funds");
-        let balance: Int = self.getBalance(msg.sharesSubject, ctx.sender);
-        let newBalance: Int = balance + msg.amount;
-        // singleBalance.set(ctx.sender, newBalance);
-
-        //self.sharesBalance.set(msg.sharesSubject, Balance{
-        //    balance: singleBalance
-        //});
-
-        // more code
-
-    }
-
-    /*
-    virtual inline fun _send_payment() {
-            let seller: Address = self.auctionInfo.beneficiary;
-            let winningBidAmount: Int = self.auctionInfo.nftHighestBid;
-            send(SendParameters{
-                to: seller,
-                value: winningBidAmount - ton("0.06"),
-                mode: SendPayGasSeparately,
-                bounce: false,
-                body: "Pay winning bid amount".asComment()
-            });
-        }
-        */
-
-    // getters
 
     get fun getVersion(): String {
         return "1.0.0";
@@ -115,11 +96,18 @@ contract Shares with Deployable {
     }
 
     get fun getPrice(supply: Int, amount: Int): Int {
-        let sum1: Int = ((supply - 1) * (supply) * (2 * (supply - 1) + 1)) / 6;
-        let sum2: Int = ((supply + amount - 1) * (supply + amount) * (2 * (supply + amount - 1) + 1)) / 6;
+        let sum1: Int = 0;
+        if (supply != 0) {
+            sum1 = ((supply - 1) * (supply) * (2 * (supply - 1) + 1)) / 6;
+        }
+        let sum2: Int = 0;
+        if (supply != 0 || amount != 1) {
+            sum2 = ((supply + amount - 1) * (supply + amount) * (2 * (supply + amount - 1) + 1)) / 6;
+        }
         return (sum1 + sum2) * ONE_ETHER / DIV_FACTOR;
     }
 
+/*
     get fun getBuyPrice(sharesSubject: Address, amount: Int): Int {
         let supply: Int = 0;
         if (self.sharesSupply.get(sharesSubject) != null) {
@@ -135,7 +123,6 @@ contract Shares with Deployable {
         }
         return self.getPrice(supply - amount, amount);
     }
-
     get fun getBuyPriceAfterFee(sharesSubject: Address, amount: Int): Int {
         let price: Int = self.getBuyPrice(sharesSubject, amount);
         let protocolFee: Int = price * self.protocolFeePercentage / ONE_ETHER;
@@ -157,7 +144,7 @@ contract Shares with Deployable {
         }
         return 0;
     }
-
+*/
 
 }
 

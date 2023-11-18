@@ -4,6 +4,7 @@
     "scripts": {
         "start": "blueprint run",
         "build": "blueprint build",
+        "build:all": "rm -rf ./build/* && blueprint build --all",
         "test": "jest",
         "lint": "prettier --write 'scripts/**/*' && prettier --write 'tests/**/*'"
     },
