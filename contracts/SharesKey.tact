@@ -3,52 +3,41 @@ import "@stdlib/deploy";
 import "./SharesWallet";
 
 message FirstKeys {
-    sender: Address;
-    owner: Address;
+    subject: Address;
+    remain: Int as coins;
     initialSupply: Int as uint16;
-    price: Int as coins;
-    protocolFee: Int as coins;
-    subjectFee: Int as coins;
-    value: Int as coins;
+}
+
+message AfterNewKey {
+    subject: Address;
+    supply: Int as uint16;
 }
 
 message CurrentSupply {
     holder: Address;
     amount: Int as uint16;
-    incr: Bool;
-    value: Int as uint64;
+    increment: Bool;
+    remain: Int as coins;
+}
+
+message CompleteTrade{
+    subject: Address;
+    holder: Address;
+    supply: Int as uint16;
+    balance: Int as uint16;
+    amount: Int as uint16;
+    increment: Bool;
+    remain: Int as coins;
 }
 
 message UpdateSupplyAndBalance {
-    holder: Address;
-    amount: Int as uint16;
-    incr: Bool;
-    value: Int as uint64;
-}
-
-message Supply{
     subject: Address;
     holder: Address;
-    supply: Int as uint16;
     amount: Int as uint16;
-    incr: Bool;
-    value: Int as uint64;
-}
-
-message UpdatedSupplyAndBalance {
-    subject: Address;
-    supply: Int as uint16;
-    amount: Int as uint16;
-    incr: Bool;
-    value: Int as uint64;
-    price: Int as uint64;
-    protocolFee: Int as uint64;
-    subjectFee: Int as uint;
-}
-
-message RevertError {
-    sender: Address;
-    value: Int as coins;
+    increment: Bool;
+    price: Int as coins;
+    protocolFee: Int as coins;
+    subjectFee: Int as coins;
 }
 
 contract SharesKey with Deployable {
@@ -67,85 +56,125 @@ contract SharesKey with Deployable {
 
     receive() {}
 
-    inline fun _refund_user(value: Int): Address {
-        let ctx: Context = context();
+    receive(msg: FirstKeys) {
+        require(sender() == self.sharesContract, "Forbidden");
+        require(self.supply == 0, "Already initialized");
+        let initCode: StateInit = self.calculate_sharesWallet_init(self.subject);
+        self.supply = msg.initialSupply;
         send(SendParameters{
-         to: self.subject,
-         value: _estimate_rest_value(ctx.balance),
-         bounce: true,
-         mode: SendRemainingValue
+            to: contractAddress(initCode),
+            value: 0,
+            bounce: true,
+            body: UpdateBalance{
+                    amount: msg.initialSupply,
+                    increment: true
+                }.toCell(),
+            mode: SendRemainingValue + SendIgnoreErrors,
+            code: initCode.code,
+            data: initCode.data
+        });
+        send(SendParameters{
+            to: self.sharesContract,
+            value: 0,
+            bounce: false,
+            mode: SendRemainingValue + SendIgnoreErrors,
+            body: AfterNewKey{
+                subject: self.subject,
+                supply: self.supply
+            }.toCell()
         });
     }
 
-    inline fun _estimate_rest_value(remain: Int): Int {
-        let tonBalanceBeforeMsg: Int = myBalance() - remain;
-        let storageFee: Int = self.minTonsForStorage - min(tonBalanceBeforeMsg, self.minTonsForStorage);
-        return remain - (storageFee + self.gasConsumption);
-    }
-
-    receive(msg: FirstKeys) {
-        if (self.supply > 0) {
-
-            log("My contract is doing something important.");
-            _refund_user();
+    bounced(src: UpdateBalance) {
+        if (src.increment) {
+            self.supply = self.supply - src.amount;
         } else {
-            let ctx: Context = context();
-            require(ctx.sender == self.sharesContract, "Forbidden");
-            let initCode: StateInit = self.calculate_sharesWallet_init(msg.owner);
-            self.supply = msg.initialSupply;
-            send(SendParameters{
-             to: contractAddress(initCode),
-             value: 0,
-             bounce: true,
-             mode: SendRemainingValue + SendIgnoreErrors,
-             body: UpdateBalance{
-                 amount: msg.initialSupply,
-                 incr: true
-             }.toCell(),
-             code: initCode.code,
-             data: initCode.data
-            });
+            self.supply = self.supply + src.amount;
         }
     }
 
-    receive(msg: UpdateSupplyAndBalance) {
+    // get supply
+
+    receive(msg: CurrentSupply) {
         require(self.supply > 0, "Not initialized");
+        require(sender() == self.sharesContract, "Forbidden");
+        let initCode: StateInit = self.calculate_sharesWallet_init(msg.holder);
+        send(SendParameters{
+            to: contractAddress(initCode),
+            value: 0,
+            mode: SendRemainingValue + SendIgnoreErrors,
+            body: GetBalance{
+                holder: msg.holder,
+                amount: msg.amount,
+                increment: msg.increment,
+                remain: msg.remain,
+                balance: 0
+            }.toCell()
+        });
+    }
+
+    receive(msg: GetBalance) {
+        let initCode: StateInit = self.calculate_sharesWallet_init(msg.holder);
+        require(sender() == contractAddress(initCode), "Forbidden");
+        send(SendParameters{
+            to: self.sharesContract,
+            value: 0,
+            mode: SendRemainingValue + SendIgnoreErrors,
+            body: CompleteTrade{
+                    subject: self.subject,
+                    holder: msg.holder,
+                    supply: self.supply,
+                    balance: msg.balance,
+                    amount: msg.amount,
+                    increment: msg.increment,
+                    remain: msg.remain
+                }.toCell()
+        });
+    }
+
+    receive(msg: UpdateSupplyAndBalance) {
         require(context().sender == self.sharesContract, "Forbidden");
-        if (msg.incr) {
+        if (msg.increment) {
             self.supply = self.supply + msg.amount;
         } else {
-            require(self.supply >= msg.amount, "Insufficient balance");
+            // this exception should never happen, but it may have changed in the meantime
+            require(self.supply >= msg.amount, "Insufficient supply");
             self.supply = self.supply + msg.amount;
         }
         let initCode: StateInit = self.calculate_sharesWallet_init(msg.holder);
         send(SendParameters{
          to: contractAddress(initCode),
          value: 0,
+         bounce: true,
          mode: SendRemainingValue + SendIgnoreErrors,
          body: UpdateBalance{
              amount: msg.amount,
-             incr: true
+             increment: msg.increment
          }.toCell()
+        });
+        send(SendParameters{
+            to: self.sharesContract,
+            value: 0,
+            bounce: false,
+            mode: SendRemainingValue + SendIgnoreErrors,
+               body: UpdateSupplyAndBalance{
+                   subject: self.subject,
+                   holder: msg.holder,
+                   amount: msg.amount,
+                   increment: msg.increment,
+                   price: msg.price,
+                   protocolFee: msg.protocolFee,
+                   subjectFee: msg.subjectFee
+               }.toCell()
         });
     }
 
-    receive(msg: CurrentSupply) {
-        require(self.supply > 0, "Not initialized");
-        require(context().sender == self.sharesContract, "Forbidden");
-        self.reply(
-            Supply{
-                subject: self.subject,
-                supply: self.supply,
-                holder: msg.holder,
-                amount: msg.amount,
-                incr: msg.incr,
-                value: msg.value
-            }.toCell()
-        );
+    get fun supply(): Int {
+        return self.supply;
     }
 
-    inline fun calculate_sharesWallet_init(owner: Address): StateInit {
-        return initOf SharesWallet(owner, self.subject, myAddress());
+    inline fun calculate_sharesWallet_init(holder: Address): StateInit {
+        return initOf SharesWallet(holder, self.subject, myAddress());
     }
 
 }

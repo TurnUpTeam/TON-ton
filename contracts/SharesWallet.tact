@@ -2,7 +2,7 @@ import "@stdlib/deploy";
 
 message UpdateBalance {
     amount: Int as uint16;
-    incr: Bool;
+    increment: Bool;
 }
 
 message WalletError {
@@ -11,34 +11,59 @@ message WalletError {
 
 message BalanceUpdated {
     balance: Int as uint16;
-    incr: Bool;
+    increment: Bool;
+}
+
+message GetBalance {
+    holder: Address;
+    amount: Int as uint16;
+    increment: Bool;
+    remain: Int as coins;
+    balance: Int as uint16;
 }
 
 contract SharesWallet with Deployable {
     subject: Address;
-    owner: Address;
+    holder: Address;
     keysContract: Address;
     balance: Int as uint16 = 0;
 
     receive() {}
 
-    init(owner: Address, subject: Address, keysContract: Address) {
+    init(holder: Address, subject: Address, keysContract: Address) {
         require(sender() == keysContract, "Not the Keys contract");
-        self.owner = owner;
+        self.holder = holder;
         self.subject = subject;
         self.keysContract = keysContract;
     }
 
     receive(msg: UpdateBalance) {
-        log("My contract is doing something important.");
         require(sender() == self.keysContract, "Forbidden");
-        if (msg.incr) {
+        if (msg.increment) {
             self.balance = self.balance + msg.amount;
-        } else if (owner == self.subject) {
-            require(self.balance > msg.amount, "Subject cannot sell last key");
         } else {
-            require(self.balance >= msg.amount, "Insufficient balance");            }
+            if (self.holder == self.subject) {
+                require(self.balance > msg.amount, "Subject cannot sell last key");
+            } else {
+                require(self.balance >= msg.amount, "Insufficient balance");
+            }
+            self.balance = self.balance - msg.amount;
         }
+    }
+
+    receive(msg: GetBalance) {
+        require(sender() == self.keysContract, "Forbidden");
+        self.reply(GetBalance{
+            holder: msg.holder,
+            amount: msg.amount,
+            increment: msg.increment,
+            remain: msg.remain,
+            balance: self.balance
+        }.toCell());
+    }
+
+    get fun balance(): Int {
+        return self.balance;
     }
 
 }
