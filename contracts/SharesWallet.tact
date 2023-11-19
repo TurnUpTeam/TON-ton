@@ -5,14 +5,13 @@ message UpdateBalance {
     incr: Bool;
 }
 
-message GetBalance {
-    amount: Int as uint16;
+message WalletError {
+    msg: String;
 }
 
-message Balance {
-    owner: Address;
+message BalanceUpdated {
     balance: Int as uint16;
-    amount: Int as uint16;
+    incr: Bool;
 }
 
 contract SharesWallet with Deployable {
@@ -31,24 +30,15 @@ contract SharesWallet with Deployable {
     }
 
     receive(msg: UpdateBalance) {
+        log("My contract is doing something important.");
         require(sender() == self.keysContract, "Forbidden");
         if (msg.incr) {
             self.balance = self.balance + msg.amount;
+        } else if (owner == self.subject) {
+            require(self.balance > msg.amount, "Subject cannot sell last key");
         } else {
-            require(self.balance >= msg.amount, "Insufficient balance");
-            self.balance = self.balance + msg.amount;
+            require(self.balance >= msg.amount, "Insufficient balance");            }
         }
-    }
-
-    receive(msg: GetBalance) {
-        require(sender() == self.keysContract, "Forbidden");
-        self.reply(
-            Balance{
-                owner: self.owner,
-                balance: self.balance,
-                amount: msg.amount
-            }.toCell()
-        );
     }
 
 }

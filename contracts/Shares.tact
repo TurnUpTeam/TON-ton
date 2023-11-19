@@ -3,9 +3,6 @@ import "@stdlib/deploy";
 import "./SharesWallet";
 import "./SharesKey";
 
-const ONE_ETHER: Int = 1000000000000000000;
-const DIV_FACTOR: Int = 2000;
-
 message UpdateFeeDestination {
     feeDestination: Address;
 }
@@ -24,17 +21,22 @@ message NewKey {
     initialSupply: Int as uint16;
 }
 
-message BuyShares {
+message BuySellShares {
     subject: Address;
     holder: Address;
     amount: Int as uint16;
+    incr: Bool;
 }
 
 contract Shares with Deployable {
+
+    const minTonsForStorage: Int = ton("0.05");
+    const gasConsumption: Int = ton("0.05");
+
     admin: Address;
     feeDestination: Address;
-    protocolFeePercentage: Int as uint16 = 0;
-    subjectFeePercentage: Int as uint16 = 0;
+    protocolFeePercentage: Int as uint8 = 5;
+    subjectFeePercentage: Int as uint8 = 5;
     totalSupply: Int as uint32 = 0;
 
     key_content: Cell;
@@ -65,23 +67,30 @@ contract Shares with Deployable {
 
     receive(msg: NewKey) {
         let ctx: Context = context();
-        require(msg.subject == ctx.sender, "Invalid sender");
         let initCode: StateInit = self.calculate_sharesKey_init(msg.subject);
+        let price: Int = self.getPrice(0, initialSupply);
+        let protocolFee: Int = price * self.protocolFeePercentage / 100;
+        let subjectFee: Int = price * self.subjectFeePercentage / 100;
         send(SendParameters{
             to: contractAddress(initCode),
             value: 0,
             bounce: true,
             mode: SendRemainingValue + SendIgnoreErrors,
             body: FirstKeys{
+                sender: ctx.sender,
+                value: _estimate_rest_value(ctx.value),
                 owner: msg.subject,
-                initialSupply: msg.initialSupply
+                initialSupply: msg.initialSupply,
+                price: price,
+                protocolFee: protocolFee,
+                subjectFee: subjectFee,
             }.toCell(),
             code: initCode.code,
             data: initCode.data
         });
     }
 
-    receive(msg: BuyShares) {
+    receive(msg: BuySellShares) {
         let ctx: Context = context();
         let initCode: StateInit = self.calculate_sharesKey_init(msg.subject);
         let initCode2: StateInit = self.calculate_sharesWallet_init(msg.holder, msg.subject, contractAddress(initCode));
@@ -91,14 +100,16 @@ contract Shares with Deployable {
             value: 0,
             bounce: true,
             mode: SendRemainingValue + SendIgnoreErrors,
-            body: Holder{
+            body: CurrentSupply{
                 holder: msg.holder,
-                amount: msg.amount
+                amount: msg.amount,
+                incr: msg.incr,
+                value: ctx.value
             }.toCell()
         });
     }
 
-    receive(msg: SupplyAndBalance) {
+    receive(msg: Supply) {
         let ctx: Context = context();
         let initCode: StateInit = self.calculate_sharesKey_init(msg.subject);
         let initCode2: StateInit = self.calculate_sharesWallet_init(msg.holder, msg.subject, contractAddress(initCode));
@@ -106,25 +117,63 @@ contract Shares with Deployable {
         let subject: Address = msg.subject;
         let holder: Address = msg.holder;
         let supply: Int = msg.supply;
-        let balance: Int = msg.balance;
-        let price: Int = self.getPrice(supply, balance);
-        let protocolFee: Int = price * self.protocolFeePercentage / ONE_ETHER;
-        let subjectFee: Int = price * self.subjectFeePercentage / ONE_ETHER;
-        // we have to add the gas to the following
-        require(ctx.value >= price + protocolFee + subjectFee, "Insufficient funds");
+        let amount: Int = msg.amount;
+        let price: Int = self.getPrice(supply, amount);
+        let protocolFee: Int = price * self.protocolFeePercentage / 100;
+        let subjectFee: Int = price * self.subjectFeePercentage / 100;
+        let remain: Int = self._estimate_rest_value(msg.value);
+        // it should refund the user
+        require(remain >= price + protocolFee + subjectFee, "Insufficient funds");
+        if (!msg.incr) {
+            require(supply > msg.amount, "Insufficient keys");
+        }
         send(SendParameters{
             to: contractAddress(initCode),
             value: 0,
             bounce: true,
             mode: SendRemainingValue + SendIgnoreErrors,
-            body: UpdateHolderBalance{
+            body: UpdateSupplyAndBalance{
                 holder: msg.holder,
                 amount: msg.amount,
-                incr: true
+                incr: msg.incr,
+                value: msg.value,
+                price: price,
+                protocolFee: protocolFee,
+                subjectFee: subjectFee
             }.toCell()
         });
-        // TODO send the money
+    }
 
+    receive(msg: UpdatedSupplyAndBalance) {
+
+        send(SendParameters{
+            to: self.feeDestination,
+            value: protocolFee,
+            bounce: true,
+            mode: SendRemainingValue + SendIgnoreErrors
+        });
+
+    }
+
+    receive(msg: RevertError) {
+        let initCode: StateInit = self.calculate_sharesKey_init(msg.subject);
+        require(ctx.sender == contractAddress(initCode), "Invalid sender");
+        _refund_holder(_estimate_rest_value(msg.value));
+    }
+
+   inline fun _refund_holder(remain: Int): Int {
+        send(SendParameters{
+            to: msg.holder,
+            value: remain,
+            bounce: true,
+            mode: SendIgnoreErrors
+        });
+    }
+
+    inline fun _estimate_rest_value(remain: Int): Int {
+        let tonBalanceBeforeMsg: Int = myBalance() - remain;
+        let storageFee: Int = self.minTonsForStorage - min(tonBalanceBeforeMsg, self.minTonsForStorage);
+        return remain - (storageFee + self.gasConsumption);
     }
 
     inline fun calculate_sharesKey_init(subject: Address): StateInit {
@@ -160,7 +209,8 @@ contract Shares with Deployable {
         if (supply != 0 || amount != 1) {
             sum2 = ((supply + amount - 1) * (supply + amount) * (2 * (supply + amount - 1) + 1)) / 6;
         }
-        return (sum1 + sum2) * ONE_ETHER / DIV_FACTOR;
+        // TODO Set the correct factor
+        return (sum1 + sum2) * 10000000;
     }
 
 
