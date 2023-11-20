@@ -30,16 +30,6 @@ message CompleteTrade{
     remain: Int as coins;
 }
 
-message UpdateSupplyAndBalance {
-    subject: Address;
-    holder: Address;
-    amount: Int as uint16;
-    increment: Bool;
-    price: Int as coins;
-    protocolFee: Int as coins;
-    subjectFee: Int as coins;
-}
-
 contract SharesKey with Deployable {
     const minTonsForStorage: Int = ton("0.05");
     const gasConsumption: Int = ton("0.05");
@@ -61,6 +51,7 @@ contract SharesKey with Deployable {
         require(self.supply == 0, "Already initialized");
         let initCode: StateInit = self.calculate_sharesWallet_init(self.subject);
         self.supply = msg.initialSupply;
+        // this should never fail
         send(SendParameters{
             to: contractAddress(initCode),
             value: 0,
@@ -119,13 +110,14 @@ contract SharesKey with Deployable {
         send(SendParameters{
             to: self.sharesContract,
             value: 0,
+            bounce: false,
             mode: SendRemainingValue + SendIgnoreErrors,
             body: CompleteTrade{
                     subject: self.subject,
                     holder: msg.holder,
                     supply: self.supply,
-                    balance: msg.balance,
                     amount: msg.amount,
+                    balance: msg.balance,
                     increment: msg.increment,
                     remain: msg.remain
                 }.toCell()
@@ -137,9 +129,10 @@ contract SharesKey with Deployable {
         if (msg.increment) {
             self.supply = self.supply + msg.amount;
         } else {
-            // this exception should never happen, but it may have changed in the meantime
-            require(self.supply >= msg.amount, "Insufficient supply");
-            self.supply = self.supply + msg.amount;
+            if (msg.holder == self.subject) {
+                require(self.supply > msg.amount, "Subject cannot sell last key");
+            }
+            self.supply = self.supply - msg.amount;
         }
         let initCode: StateInit = self.calculate_sharesWallet_init(msg.holder);
         send(SendParameters{
@@ -147,26 +140,39 @@ contract SharesKey with Deployable {
          value: 0,
          bounce: true,
          mode: SendRemainingValue + SendIgnoreErrors,
-         body: UpdateBalance{
-             amount: msg.amount,
-             increment: msg.increment
+         body: UpdateSupplyAndBalance{
+            subject: self.subject,
+           holder: msg.holder,
+           amount: msg.amount,
+           increment: msg.increment,
+           balance: msg.balance,
+           price: msg.price,
+           protocolFee: msg.protocolFee,
+           subjectFee: msg.subjectFee
          }.toCell()
         });
+    }
+
+    receive(msg: WalletUpdated) {
+        let initCode: StateInit = self.calculate_sharesWallet_init(msg.holder);
+        require(sender() == contractAddress(initCode), "Forbidden");
         send(SendParameters{
-            to: self.sharesContract,
-            value: 0,
-            bounce: false,
-            mode: SendRemainingValue + SendIgnoreErrors,
-               body: UpdateSupplyAndBalance{
-                   subject: self.subject,
-                   holder: msg.holder,
-                   amount: msg.amount,
-                   increment: msg.increment,
-                   price: msg.price,
-                   protocolFee: msg.protocolFee,
-                   subjectFee: msg.subjectFee
-               }.toCell()
-        });
+                    to: self.sharesContract,
+                    value: 0,
+                    bounce: false,
+                    mode: SendRemainingValue + SendIgnoreErrors,
+                       body: UpdateSupplyAndBalance{
+                           subject: self.subject,
+                           holder: msg.holder,
+                           amount: msg.amount,
+                           balance: msg.balance,
+                           increment: msg.increment,
+                           price: msg.price,
+                           protocolFee: msg.protocolFee,
+                           subjectFee: msg.subjectFee
+                       }.toCell()
+                });
+
     }
 
     get fun supply(): Int {

@@ -5,6 +5,28 @@ message UpdateBalance {
     increment: Bool;
 }
 
+message UpdateSupplyAndBalance {
+    subject: Address;
+    holder: Address;
+    amount: Int as uint16;
+    balance: Int as uint16;
+    increment: Bool;
+    price: Int as coins;
+    protocolFee: Int as coins;
+    subjectFee: Int as coins;
+}
+
+message WalletUpdated {
+    subject: Address;
+    holder: Address;
+    amount: Int as uint16;
+    balance: Int as uint16;
+    increment: Bool;
+    price: Int as coins;
+    protocolFee: Int as coins;
+    subjectFee: Int as coins;
+}
+
 message WalletError {
     msg: String;
 }
@@ -42,13 +64,29 @@ contract SharesWallet with Deployable {
         if (msg.increment) {
             self.balance = self.balance + msg.amount;
         } else {
-            if (self.holder == self.subject) {
-                require(self.balance > msg.amount, "Subject cannot sell last key");
-            } else {
-                require(self.balance >= msg.amount, "Insufficient balance");
-            }
+            require(self.balance >= msg.amount, "Insufficient balance");
             self.balance = self.balance - msg.amount;
         }
+    }
+
+    receive(msg: UpdateSupplyAndBalance) {
+        require(sender() == self.keysContract, "Forbidden");
+        if (msg.increment) {
+            self.balance = self.balance + msg.amount;
+        } else {
+            require(self.balance >= msg.amount, "Insufficient balance");
+            self.balance = self.balance - msg.amount;
+        }
+        self.reply(WalletUpdated{
+            subject: msg.subject,
+           holder: self.holder,
+           amount: msg.amount,
+           increment: msg.increment,
+           price: msg.price,
+           protocolFee: msg.protocolFee,
+           subjectFee: msg.subjectFee,
+           balance: self.balance
+        }.toCell());
     }
 
     receive(msg: GetBalance) {

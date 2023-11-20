@@ -69,8 +69,14 @@ contract Shares with Deployable {
     // Initialize the subject
 
     receive(msg: NewKey) {
+        require(msg.initialSupply > 0, "Initial supply must be greater than 0");
         let ctx: Context = context();
+
         let initCodeKey: StateInit = self.calculate_sharesKey_init(msg.subject);
+        // TODO ^^ check if the key contract already exists, if possible
+        // something like:
+        // require(!exists(initCodeKey), "Key already exists");
+
         let price: Int = self.getPrice(0, msg.initialSupply);
         let protocolFee: Int = price * self.protocolFeePercentage / 100;
         let subjectFee: Int = price * self.subjectFeePercentage / 100;
@@ -123,11 +129,10 @@ contract Shares with Deployable {
     receive(msg: Trade) {
         let ctx: Context = context();
         let initCodeKey: StateInit = self.calculate_sharesKey_init(msg.subject);
-        let initCodeWallet: StateInit = self.calculate_sharesWallet_init(msg.holder, msg.subject, contractAddress(initCodeKey));
         require(ctx.sender == msg.holder, "Invalid sender");
         let remain: Int = self.estimate_rest_value(ctx.value);
         send(SendParameters{
-            to: contractAddress(initCodeWallet),
+            to: contractAddress(initCodeKey),
             value: 0,
             bounce: true,
             mode: SendRemainingValue + SendIgnoreErrors,
@@ -140,10 +145,15 @@ contract Shares with Deployable {
         });
     }
 
+    bounced(src: bounced<CurrentSupply>) {
+        // the message reverted, so we refund the sender
+        // TODO Same error as above
+        // self.send_funds(src.holder, src.remain);
+    }
+
     receive(msg: CompleteTrade) {
         let ctx: Context = context();
         let initCodeKey: StateInit = self.calculate_sharesKey_init(msg.subject);
-        let initCodeWallet: StateInit = self.calculate_sharesWallet_init(msg.holder, msg.subject, contractAddress(initCodeKey));
         require(ctx.sender == contractAddress(initCodeKey), "Invalid sender");
         let price: Int = self.getPrice(msg.supply, msg.amount);
         let protocolFee: Int = price * self.protocolFeePercentage / 100;
@@ -164,6 +174,7 @@ contract Shares with Deployable {
                     amount: msg.amount,
                     increment: msg.increment,
                     price: price,
+                    balance: 0,
                     protocolFee: protocolFee,
                     subjectFee: subjectFee
                 }.toCell()
