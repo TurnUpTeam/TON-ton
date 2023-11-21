@@ -40,12 +40,9 @@ contract Shares with Deployable {
     subjectFeePercentage: Int as uint8 = 5;
     totalSupply: Int as uint32 = 0;
 
-    key_content: Cell;
-
-    init(key_content: Cell) {
+    init() {
         self.admin = sender();
         self.feeDestination = sender();
-        self.key_content = key_content;
     }
 
     receive() {}
@@ -206,8 +203,16 @@ contract Shares with Deployable {
         return initOf SharesKey(subject, myAddress());
     }
 
-    inline fun calculate_sharesWallet_init(holder: Address, subject: Address, keyAddress: Address): StateInit {
-        return initOf SharesWallet(holder, subject, keyAddress);
+    get fun keyAddress(subject: Address): Address {
+        return contractAddress(self.calculate_sharesKey_init(subject));
+    }
+
+    inline fun calculate_sharesWallet_init(holder: Address, subject: Address): StateInit {
+        return initOf SharesWallet(holder, subject, myAddress());
+    }
+
+    get fun walletAddress(holder: Address, subject: Address): Address {
+        return contractAddress(self.calculate_sharesWallet_init(holder, subject));
     }
 
     get fun getVersion(): String {
