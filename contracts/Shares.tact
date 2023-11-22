@@ -77,8 +77,7 @@ contract Shares with Deployable {
         let price: Int = self.getPrice(0, msg.initialSupply);
         let protocolFee: Int = price * self.protocolFeePercentage / 100;
         let subjectFee: Int = price * self.subjectFeePercentage / 100;
-        let remain: Int = self.estimate_rest_value(ctx.value);
-        require(remain >= price + protocolFee + subjectFee, "Insufficient funds");
+        require(ctx.value >= price + protocolFee + subjectFee, "Insufficient funds");
         send(SendParameters{
             to: contractAddress(initCodeKey),
             value: 0,
@@ -86,7 +85,7 @@ contract Shares with Deployable {
             mode: SendRemainingValue + SendIgnoreErrors,
             body: FirstKeys{
                 subject: ctx.sender,
-                remain: remain,
+                remain: ctx.value,
                 initialSupply: msg.initialSupply
             }.toCell(),
             code: initCodeKey.code,
@@ -203,7 +202,7 @@ contract Shares with Deployable {
         return initOf SharesKey(subject, myAddress());
     }
 
-    get fun keyAddress(subject: Address): Address {
+    get fun getKeyAddress(subject: Address): Address {
         return contractAddress(self.calculate_sharesKey_init(subject));
     }
 
@@ -211,7 +210,7 @@ contract Shares with Deployable {
         return initOf SharesWallet(holder, subject, myAddress());
     }
 
-    get fun walletAddress(holder: Address, subject: Address): Address {
+    get fun getWalletAddress(holder: Address, subject: Address): Address {
         return contractAddress(self.calculate_sharesWallet_init(holder, subject));
     }
 

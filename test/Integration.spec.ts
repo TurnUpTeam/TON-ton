@@ -66,8 +66,12 @@ describe('Integration', () => {
     it("should create a first key and the relative holder", async()=>{
 
         const price = await shares.getGetPrice(0n, 3n);
-        const protocolFee = await shares.getGetFeePercentage();
-        const subjectFee = await shares.getGetSubjectFeePercentage();
+        const protocolFeePercentage = await shares.getGetFeePercentage();
+        const subjectFeePercentage = await shares.getGetSubjectFeePercentage();
+
+        let protocolFee = price * protocolFeePercentage / 100n;
+        let subjectFee = price * subjectFeePercentage / 100n;
+
 
         subject = await blockchain.treasury('subject');
         newKeyMsg = {
@@ -84,19 +88,21 @@ describe('Integration', () => {
             newKeyMsg
         );
 
-        key = blockchain.openContract(await SharesKey.fromInit(subject.address, shares.address));
+        // key = blockchain.openContract(await SharesKey.fromInit(subject.address, shares.address));
 
         expect(result.transactions).toHaveTransaction({
             from: subject.address,
             to: shares.address,
-            // success: true
+            success: true
         })
 
-        // expect(result.transactions).toHaveTransaction({
-        //     from: shares.address,
-        //     to: key.address,
-        //     // success: true
-        // })
+        const keyAddress = await shares.getGetKeyAddress(subject.address);
+        expect(result.transactions).toHaveTransaction({
+            from: shares.address,
+            to: keyAddress,
+            success: true
+        })
+
 
         // await sleep.sleep(1);
 
