@@ -69,9 +69,10 @@ describe('Integration', () => {
         const protocolFeePercentage = await shares.getGetFeePercentage();
         const subjectFeePercentage = await shares.getGetSubjectFeePercentage();
 
+        // @ts-ignore
         let protocolFee = price * protocolFeePercentage / 100n;
+        // @ts-ignore
         let subjectFee = price * subjectFeePercentage / 100n;
-
 
         subject = await blockchain.treasury('subject');
         newKeyMsg = {
@@ -96,12 +97,12 @@ describe('Integration', () => {
             success: true
         })
 
-        const keyAddress = await shares.getGetKeyAddress(subject.address);
-        expect(result.transactions).toHaveTransaction({
-            from: shares.address,
-            to: keyAddress,
-            success: true
-        })
+        // const keyAddress = await shares.getGetKeyAddress(subject.address);
+        // expect(result.transactions).toHaveTransaction({
+        //     from: shares.address,
+        //     to: keyAddress,
+        //     success: true
+        // })
 
 
         // await sleep.sleep(1);

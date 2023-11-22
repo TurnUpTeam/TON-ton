@@ -66,6 +66,7 @@ contract Shares with Deployable {
     // Initialize the subject
 
     receive(msg: NewKey) {
+        dump("NewKey");
         require(msg.initialSupply > 0, "Initial supply must be greater than 0");
         let ctx: Context = context();
 

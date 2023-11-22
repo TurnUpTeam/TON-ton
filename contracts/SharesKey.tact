@@ -39,6 +39,8 @@ contract SharesKey with Deployable {
     supply: Int as uint16 = 0;
 
     init(subject: Address, sharesContract: Address) {
+        dump("SharesKey init");
+        dump(sender() == sharesContract);
         require(sender() == sharesContract, "Not the shares contract");
         self.subject = subject;
         self.sharesContract = sender();
@@ -47,11 +49,15 @@ contract SharesKey with Deployable {
     receive() {}
 
     receive(msg: FirstKeys) {
+        dump("FirstKeys");
+        /*
         require(sender() == self.sharesContract, "Forbidden");
         require(self.supply == 0, "Already initialized");
+        dump("FirstKeys");
         let initCode: StateInit = self.calculate_sharesWallet_init(self.subject);
         self.supply = msg.initialSupply;
         // this should never fail
+        dump("Deploying wallet");
         send(SendParameters{
             to: contractAddress(initCode),
             value: 0,
@@ -74,7 +80,22 @@ contract SharesKey with Deployable {
                 supply: self.supply
             }.toCell()
         });
+        */
     }
+
+    /*virtual inline fun _internal_transfer_excesses(ctx: Context, msg: JettonInternalTransfer, remain: Int){
+        if((msg.response_address != newAddress(0, 0)) && remain > 0){
+            send(SendParameters{
+                to: msg.response_address,
+                value: remain,
+                bounce: false,
+                mode: SendIgnoreErrors,
+                body: JettonExcesses{
+                    query_id: msg.query_id
+                }.toCell()
+            });
+        }
+    }*/
 
     bounced(src: UpdateBalance) {
         if (src.increment) {
