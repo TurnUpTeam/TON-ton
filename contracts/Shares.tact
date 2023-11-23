@@ -29,7 +29,7 @@ message Trade {
 }
 
 struct Query {
-    given_supply: Int as uint16;
+    givenSupply: Int as uint16;
     subject: Address;
     holder: Address;
     amount: Int as uint16;
@@ -90,7 +90,7 @@ contract Shares with Deployable {
         require(ctx.value >= price + protocolFee + subjectFee + self.gasConsumption, "Insufficient funds");
         self.lastQueryId = self.lastQueryId + 1;
         self.queries.set(self.lastQueryId, Query{
-            given_supply: 0,
+            givenSupply: 0,
             subject: msg.subject,
             holder: msg.subject,
             amount: msg.supply,
@@ -144,26 +144,27 @@ contract Shares with Deployable {
 
     receive(msg: UpdateBalance) {
         dump("Shares:UpdateBalance");
-        let query: Query = Query{
-            given_supply: 0,
-            subject: newAddress(0, 0),
-            holder: newAddress(0, 0),
-            amount: 0,
-            value: 0,
-            increment: false
-        };
+        dump(context().value);
+        let givenSupply: Int = 0;
+        let subject: Address = newAddress(0, 0);
+        dump("What the fuck");
         if (self.queries.get(msg.query_id) != null) {
-            query = self.queries.get(msg.query_id)!!;
+            dump("Not null");
+            givenSupply = (self.queries.get(msg.query_id)!!).givenSupply;
+            dump(givenSupply);
+            subject = (self.queries.get(msg.query_id)!!).subject;
         } else {
+            dump("Query not found");
             require(false, "Query not found");
         }
-        let price: Int = self.getPrice(query.given_supply, msg.amount);
+        let price: Int = self.getPrice(givenSupply, msg.amount);
+        dump(price);
         let protocolFee: Int = price * self.protocolFeePercentage / 100;
         let subjectFee: Int = price * self.subjectFeePercentage / 100;
         self.send_funds(self.feeDestination, protocolFee);
-        self.send_funds(query.subject, subjectFee);
+        self.send_funds(subject, subjectFee);
         dump("Final balance");
-        dump(myBalance() > price);
+        dump(myBalance());
     }
 
     inline fun send_funds(address: Address, amount: Int) {
