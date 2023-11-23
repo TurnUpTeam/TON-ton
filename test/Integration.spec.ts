@@ -69,6 +69,8 @@ describe('Integration', () => {
         const protocolFeePercentage = await shares.getGetFeePercentage();
         const subjectFeePercentage = await shares.getGetSubjectFeePercentage();
 
+        const gasConsumption = await shares.getGetGasConsumption();
+
         // @ts-ignore
         let protocolFee = price * protocolFeePercentage / 100n;
         // @ts-ignore
@@ -78,18 +80,16 @@ describe('Integration', () => {
         newKeyMsg = {
             $$type: 'NewKey',
             subject: subject.address,
-            initialSupply: 3n,
+            supply: 3n,
         };
 
         const result = await shares.send(
             subject.getSender(),
             {
-                value: price + protocolFee + subjectFee,
+                value: price + protocolFee + subjectFee + gasConsumption,
             },
             newKeyMsg
         );
-
-        // key = blockchain.openContract(await SharesKey.fromInit(subject.address, shares.address));
 
         expect(result.transactions).toHaveTransaction({
             from: subject.address,
@@ -97,17 +97,32 @@ describe('Integration', () => {
             success: true
         })
 
-        // const keyAddress = await shares.getGetKeyAddress(subject.address);
-        // expect(result.transactions).toHaveTransaction({
-        //     from: shares.address,
-        //     to: keyAddress,
-        //     success: true
-        // })
+        const keyAddress = await shares.getGetKeyAddress(subject.address);
+        expect(result.transactions).toHaveTransaction({
+            from: shares.address,
+            to: keyAddress,
+            success: true
+        })
 
+        // key supply
 
-        // await sleep.sleep(1);
+        const keyContract = blockchain.openContract(await SharesKey.fromAddress(keyAddress));
+        const keySupply = await keyContract.getSupply();
+        expect(keySupply).toEqual(3n);
 
-        // expect(await key.getSupply()).toEqual(1n);
+        // wallet balance
+        const walletAddress = await shares.getGetWalletAddress(subject.address, subject.address);
+        expect(result.transactions).toHaveTransaction({
+            from: shares.address,
+            to: walletAddress,
+            success: true
+        })
+
+        const walletContract = blockchain.openContract(await SharesWallet.fromAddress(walletAddress));
+
+        const walletBalance = await walletContract.getBalance();
+        expect(walletBalance).toEqual(3n);
+
     })
 
 });
