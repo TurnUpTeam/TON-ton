@@ -1,13 +1,13 @@
 import "@stdlib/deploy";
 
 message UpdateBalance {
-    query_id: Int as uint64;
+    queryId: Int as uint64;
     amount: Int as uint16;
     increment: Bool;
 }
 
 message UpdateSupplyAndBalance {
-    query_id: Int as uint64;
+    queryId: Int as uint64;
     subject: Address;
     holder: Address;
     amount: Int as uint16;
@@ -19,7 +19,7 @@ message UpdateSupplyAndBalance {
 }
 
 message WalletUpdated {
-    query_id: Int as uint64;
+    queryId: Int as uint64;
     subject: Address;
     holder: Address;
     amount: Int as uint16;
@@ -31,18 +31,18 @@ message WalletUpdated {
 }
 
 message WalletError {
-    query_id: Int as uint64;
+    queryId: Int as uint64;
     msg: String;
 }
 
 message BalanceUpdated {
-    query_id: Int as uint64;
+    queryId: Int as uint64;
     balance: Int as uint16;
     increment: Bool;
 }
 
 message GetBalance {
-    query_id: Int as uint64;
+    queryId: Int as uint64;
     holder: Address;
     amount: Int as uint16;
     increment: Bool;
@@ -88,7 +88,7 @@ contract SharesWallet with Deployable {
             bounce: false,
             mode: SendPayGasSeparately,
             body: UpdateBalance{
-                query_id: msg.query_id,
+                queryId: msg.queryId,
                 amount: self.balance,
                 increment: msg.increment
             }.toCell()
@@ -136,7 +136,7 @@ contract SharesWallet with Deployable {
                 bounce: false,
                 mode: SendIgnoreErrors,
                 body: Excesses{
-                    query_id: msg.query_id
+                    queryId: msg.queryId
                 }.toCell()
             });
         }

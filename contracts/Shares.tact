@@ -18,7 +18,7 @@ message UpdateFeePercentages {
 
 message NewKey {
     subject: Address;
-    supply: Int as uint16;
+    initialSupply: Int as uint16;
 }
 
 message Trade {
@@ -77,14 +77,12 @@ contract Shares with Deployable {
 
     receive(msg: NewKey) {
         dump("NewKey");
-        require(msg.supply > 0, "Initial supply must be greater than 0");
+        require(msg.initialSupply > 0, "Initial supply must be greater than 0");
         let ctx: Context = context();
+        require(ctx.sender == msg.subject, "Invalid sender");
         dump(ctx.value);
         let initCodeKey: StateInit = self.calculateSharesKeyInit(msg.subject);
-        // TODO ^^ check if the key contract already exists, if possible
-        // something like:
-        // require(!exists(initCodeKey), "Key already exists");
-        let price: Int = self.getPrice(0, msg.supply);
+        let price: Int = self.getPrice(0, msg.initialSupply);
         let protocolFee: Int = price * self.protocolFeePercentage / 100;
         let subjectFee: Int = price * self.subjectFeePercentage / 100;
         require(ctx.value >= price + protocolFee + subjectFee + self.gasConsumption, "Insufficient funds");
@@ -93,7 +91,7 @@ contract Shares with Deployable {
             givenSupply: 0,
             subject: msg.subject,
             holder: msg.subject,
-            amount: msg.supply,
+            amount: msg.initialSupply,
             value: ctx.value,
             increment: false
         });
@@ -103,9 +101,9 @@ contract Shares with Deployable {
             bounce: true,
             mode: SendRemainingValue,
             body: FirstKeys{
-                query_id: self.lastQueryId,
+                queryId: self.lastQueryId,
                 subject: ctx.sender,
-                supply: msg.supply
+                supply: msg.initialSupply
             }.toCell(),
             code: initCodeKey.code,
             data: initCodeKey.data
@@ -116,6 +114,7 @@ contract Shares with Deployable {
         // the message reverted, so we refund the sender
         // TODO For some reason the compiler says:
         // Type bounced<"FirstKeys"> does not have a field named "subject"
+        dump(src.queryId);
         // self.send_funds(src.subject, src.remain);
     }
 
@@ -131,7 +130,7 @@ contract Shares with Deployable {
             value: 0,
             bounce: true,
             body: UpdateBalance{
-                query_id: msg.query_id,
+                queryId: msg.queryId,
                 amount: msg.supply,
                 increment: true
             }.toCell(),
@@ -148,11 +147,11 @@ contract Shares with Deployable {
         let givenSupply: Int = 0;
         let subject: Address = newAddress(0, 0);
         dump("What the fuck");
-        if (self.queries.get(msg.query_id) != null) {
+        if (self.queries.get(msg.queryId) != null) {
             dump("Not null");
-            givenSupply = (self.queries.get(msg.query_id)!!).givenSupply;
+            givenSupply = (self.queries.get(msg.queryId)!!).givenSupply;
             dump(givenSupply);
-            subject = (self.queries.get(msg.query_id)!!).subject;
+            subject = (self.queries.get(msg.queryId)!!).subject;
         } else {
             dump("Query not found");
             require(false, "Query not found");

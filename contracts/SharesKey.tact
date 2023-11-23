@@ -3,19 +3,19 @@ import "@stdlib/deploy";
 import "./SharesWallet";
 
 message FirstKeys {
-    query_id: Int as uint64;
+    queryId: Int as uint64;
     subject: Address;
     supply: Int as uint16;
 }
 
 message AfterNewKey {
-    query_id: Int as uint64;
+    queryId: Int as uint64;
     subject: Address;
     supply: Int as uint16;
 }
 
 message CurrentSupply {
-    query_id: Int as uint64;
+    queryId: Int as uint64;
     holder: Address;
     amount: Int as uint16;
     increment: Bool;
@@ -23,7 +23,7 @@ message CurrentSupply {
 }
 
 message CompleteTrade{
-    query_id: Int as uint64;
+    queryId: Int as uint64;
     subject: Address;
     holder: Address;
     supply: Int as uint16;
@@ -52,7 +52,7 @@ contract SharesKey with Deployable {
     receive(msg: FirstKeys) {
         require(sender() == self.sharesContract, "Forbidden");
         require(self.supply == 0, "Already initialized");
-        let initCode: StateInit = self.calculateSharesWalletInit(self.subject);
+        require(self.subject == msg.subject, "Wrong subject");
         self.supply = msg.supply;
         let remain: Int = self.estimateRestValue() - context().readForwardFee();
         send(SendParameters{
@@ -61,7 +61,7 @@ contract SharesKey with Deployable {
             bounce: false,
             mode: SendPayGasSeparately,
             body: FirstKeys{
-                query_id: msg.query_id,
+                queryId: msg.queryId,
                 subject: self.subject,
                 supply: self.supply
             }.toCell()
@@ -77,7 +77,7 @@ contract SharesKey with Deployable {
                 bounce: false,
                 mode: SendIgnoreErrors,
                 body: JettonExcesses{
-                    query_id: msg.query_id
+                    queryId: msg.queryId
                 }.toCell()
             });
         }

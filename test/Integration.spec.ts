@@ -80,7 +80,7 @@ describe('Integration', () => {
         newKeyMsg = {
             $$type: 'NewKey',
             subject: subject.address,
-            supply: 3n,
+            initialSupply: 3n,
         };
 
         const result = await shares.send(
