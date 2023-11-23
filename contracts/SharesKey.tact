@@ -4,7 +4,6 @@ import "./SharesWallet";
 
 message FirstKeys {
     queryId: Int as uint64;
-    subject: Address;
     supply: Int as uint16;
 }
 
@@ -52,7 +51,6 @@ contract SharesKey with Deployable {
     receive(msg: FirstKeys) {
         require(sender() == self.sharesContract, "Forbidden");
         require(self.supply == 0, "Already initialized");
-        require(self.subject == msg.subject, "Wrong subject");
         self.supply = msg.supply;
         let remain: Int = self.estimateRestValue() - context().readForwardFee();
         send(SendParameters{
@@ -62,7 +60,6 @@ contract SharesKey with Deployable {
             mode: SendPayGasSeparately,
             body: FirstKeys{
                 queryId: msg.queryId,
-                subject: self.subject,
                 supply: self.supply
             }.toCell()
         });

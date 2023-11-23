@@ -3,12 +3,12 @@ import "@stdlib/deploy";
 import "./SharesWallet";
 import "./SharesKey";
 
-message UpdateFeeDestination {
-    feeDestination: Address;
-}
-
 message UpdateAdmin {
     newAdmin: Address;
+}
+
+message UpdateFeeDestination {
+    feeDestination: Address;
 }
 
 message UpdateFeePercentages {
@@ -21,9 +21,11 @@ message NewKey {
     initialSupply: Int as uint16;
 }
 
-message Trade {
+message TradeKey {
     subject: Address;
+    supply: Int as uint16;
     holder: Address;
+    balance: Int as uint16;
     amount: Int as uint16;
     increment: Bool;
 }
@@ -75,6 +77,9 @@ contract Shares with Deployable {
         self.subjectFeePercentage = msg.subjectFeePercentage;
     }
 
+
+    // first key
+
     receive(msg: NewKey) {
         dump("NewKey");
         require(msg.initialSupply > 0, "Initial supply must be greater than 0");
@@ -102,7 +107,6 @@ contract Shares with Deployable {
             mode: SendRemainingValue,
             body: FirstKeys{
                 queryId: self.lastQueryId,
-                subject: ctx.sender,
                 supply: msg.initialSupply
             }.toCell(),
             code: initCodeKey.code,
@@ -110,7 +114,7 @@ contract Shares with Deployable {
         });
     }
 
-    bounced(src: bounced<FirstKeys>) {
+    bounced(src: FirstKeys) {
         // the message reverted, so we refund the sender
         // TODO For some reason the compiler says:
         // Type bounced<"FirstKeys"> does not have a field named "subject"
@@ -122,9 +126,14 @@ contract Shares with Deployable {
         dump("Shares:FirstKeys");
         let ctx: Context = context();
         dump(ctx.value);
-        let initCodeKey: StateInit = self.calculateSharesKeyInit(msg.subject);
+        let subject: Address = newAddress(0, 0);
+        dump("What the fuck");
+        if (self.queries.get(msg.queryId) != null) {
+            subject = (self.queries.get(msg.queryId)!!).subject;
+        }
+        let initCodeKey: StateInit = self.calculateSharesKeyInit(subject);
         require(ctx.sender == contractAddress(initCodeKey), "Invalid sender");
-        let initCodeWallet: StateInit = self.calculateSharesWalletInit(msg.subject, msg.subject);
+        let initCodeWallet: StateInit = self.calculateSharesWalletInit(subject, subject);
         send(SendParameters{
             to: contractAddress(initCodeWallet),
             value: 0,
@@ -166,6 +175,57 @@ contract Shares with Deployable {
         dump(myBalance());
     }
 
+
+
+
+    // trading
+
+    /*
+    receive(msg: TradeKey) {
+            let ctx: Context = context();
+            let initCodeKey: StateInit = self.calculateSharesKeyInit(msg.subject);
+            require(ctx.sender == msg.holder, "Invalid sender");
+            if (msg.supply == 0) {
+                // first key
+                require(msg.holder == msg.subject, "Not the subject");
+            }
+            let newSupply: Int = msg.supply;
+            if (msg.increment) {
+            // buying shares
+                newSupply = msg.supply + msg.amount;
+            } else {
+            // selling shares
+                if (msg.holder == msg.subject) {
+                    require(msg.amount < msg.supply, "Subject cannot sell last key");
+                } else {
+                    require(msg.amount <= msg.balance, "Insufficient balance");
+                }
+                newSupply = msg.supply - msg.amount;
+            }
+            self.lastQueryId = self.lastQueryId + 1;
+            self.queries.set(self.lastQueryId, Query{
+                supply: msg.supply,
+                subject: msg.subject,
+                holder: msg.subject,
+                amount: msg.supply,
+                value: ctx.value,
+                increment: msg.increment
+            });
+            send(SendParameters{
+                to: contractAddress(initCodeKey),
+                value: 0,
+                bounce: true,
+                mode: SendRemainingValue + SendIgnoreErrors,
+                body: UpdateSupply{
+                    queryId: self.lastQueryId,
+                    subject: msg.subject,
+                    supply: msg.supply,
+                    newSupply: newSupply
+                }.toCell()
+            });
+        }
+*/
+
     inline fun send_funds(address: Address, amount: Int) {
         send(SendParameters{
             to: address,
@@ -174,80 +234,6 @@ contract Shares with Deployable {
             mode: SendRemainingValue + SendIgnoreErrors
         });
     }
-
-    // buy/sell shares
-
-    /*
-    receive(msg: Trade) {
-            let ctx: Context = context();
-            let initCodeKey: StateInit = self.calculateSharesKeyInit(msg.subject);
-            require(ctx.sender == msg.holder, "Invalid sender");
-            // let remain: Int = self.estimateRestValue(ctx.value);
-            send(SendParameters{
-                to: contractAddress(initCodeKey),
-                value: 0,
-                bounce: true,
-                mode: SendRemainingValue + SendIgnoreErrors,
-                body: CurrentSupply{
-                    holder: msg.holder,
-                    amount: msg.amount,
-                    increment: msg.increment,
-                    remain: ctx.value
-                }.toCell()
-            });
-        }
-
-        bounced(src: bounced<CurrentSupply>) {
-            // the message reverted, so we refund the sender
-            // TODO Same error as above
-            // self.send_funds(src.holder, src.remain);
-        }
-
-        receive(msg: CompleteTrade) {
-            let ctx: Context = context();
-            let initCodeKey: StateInit = self.calculateSharesKeyInit(msg.subject);
-            require(ctx.sender == contractAddress(initCodeKey), "Invalid sender");
-            let price: Int = self.getPrice(msg.supply, msg.amount);
-            let protocolFee: Int = price * self.protocolFeePercentage / 100;
-            let subjectFee: Int = price * self.subjectFeePercentage / 100;
-            if (msg.remain < price + protocolFee + subjectFee) {
-                self.send_funds(msg.holder, msg.remain);
-            } else if (!msg.increment && (msg.amount > msg.balance || msg.amount >= msg.supply)) {
-                self.send_funds(msg.holder, msg.remain);
-            } else {
-                send(SendParameters{
-                    to: contractAddress(initCodeKey),
-                    value: 0,
-                    bounce: true,
-                    mode: SendRemainingValue + SendIgnoreErrors,
-                    body: UpdateSupplyAndBalance{
-                        subject: msg.subject,
-                        holder: msg.holder,
-                        amount: msg.amount,
-                        increment: msg.increment,
-                        price: price,
-                        balance: 0,
-                        protocolFee: protocolFee,
-                        subjectFee: subjectFee
-                    }.toCell()
-                });
-            }
-        }
-
-        bounced(src: bounced<UpdateSupplyAndBalance>) {
-            // the message reverted, so we refund the sender
-            // TODO Same error as above
-            // self.send_funds(src.holder, src.remain);
-        }
-
-        receive(msg: UpdateSupplyAndBalance) {
-            let initCodeKey: StateInit = self.calculateSharesKeyInit(msg.subject);
-            require(sender() == contractAddress(initCodeKey), "Invalid sender");
-            self.send_funds(self.feeDestination, msg.protocolFee);
-            self.send_funds(msg.subject, msg.subjectFee);
-            self.send_funds(msg.holder, msg.price - msg.protocolFee - msg.subjectFee);
-        }
-*/
 
     inline fun calculateSharesKeyInit(subject: Address): StateInit {
         return initOf SharesKey(subject, myAddress());

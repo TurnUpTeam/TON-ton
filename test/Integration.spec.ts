@@ -125,4 +125,47 @@ describe('Integration', () => {
 
     })
 
+
+    it("should throw if first key buyer not the subject", async()=>{
+
+        const price = await shares.getGetPrice(0n, 3n);
+        const protocolFeePercentage = await shares.getGetFeePercentage();
+        const subjectFeePercentage = await shares.getGetSubjectFeePercentage();
+
+        const gasConsumption = await shares.getGetGasConsumption();
+
+        // @ts-ignore
+        let protocolFee = price * protocolFeePercentage / 100n;
+        // @ts-ignore
+        let subjectFee = price * subjectFeePercentage / 100n;
+
+        subject = await blockchain.treasury('subject');
+        subject2 = await blockchain.treasury('subject2');
+        newKeyMsg = {
+            $$type: 'NewKey',
+            subject: subject.address,
+            initialSupply: 3n,
+        };
+
+        const balanceBefore = await subject2.getBalance();
+
+        let result = await shares.send(
+            subject2.getSender(),
+            {
+                value: price + protocolFee + subjectFee + gasConsumption,
+            },
+            newKeyMsg
+        );
+
+        expect(result.transactions).toHaveTransaction({
+            from: subject2.address,
+            to: shares.address,
+            success: false
+        })
+
+        const balanceAfter = await subject2.getBalance();
+        expect(balanceBefore - balanceAfter).toBeLessThan(100000000n);
+
+    })
+
 });
