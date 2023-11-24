@@ -180,7 +180,7 @@ contract Shares with Deployable {
 
       // self.sendValueBackToUser(src.queryId);
       // self.queries.set(src.queryId, null);
-    }
+    // }
 
     receive(msg: BalanceUpdated) {
         // dump("Receiving BalanceUpdated");

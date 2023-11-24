@@ -164,7 +164,7 @@ describe('Integration', () => {
 
     })
 
-    it("should create allow holder to buy a key", async()=>{
+    it("should allow holder to buy a key", async()=>{
 
         let price = await shares.getGetPrice(0n, 3n);
         let protocolFeePercentage = await shares.getGetFeePercentage();
