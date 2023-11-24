@@ -285,6 +285,7 @@ contract Shares with Deployable {
             subject = (self.queries.get(queryId)!!).subject;
         }
         if (value) {
+            // TODO This should be improved keeping only the used gas
             self.send_funds(subject, value - self.gasConsumption);
         }
     }
