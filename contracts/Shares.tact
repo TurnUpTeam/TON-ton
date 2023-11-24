@@ -31,9 +31,10 @@ message TradeKey {
 }
 
 struct Query {
-    givenSupply: Int as uint16;
+    supply: Int as uint16;
     subject: Address;
     holder: Address;
+    balance: Int as uint16;
     amount: Int as uint16;
     value: Int as coins;
     increment: Bool;
@@ -42,7 +43,7 @@ struct Query {
 contract Shares with Deployable {
 
     const minTonsForStorage: Int = ton("0.05");
-    const gasConsumption: Int = ton("0.2");
+    const gasConsumption: Int = ton("0.3");
     const divFactor: Int = 10000000;
 
     admin: Address;
@@ -81,98 +82,140 @@ contract Shares with Deployable {
     // first key
 
     receive(msg: NewKey) {
-        dump("NewKey");
         require(msg.initialSupply > 0, "Initial supply must be greater than 0");
         let ctx: Context = context();
         require(ctx.sender == msg.subject, "Invalid sender");
-        dump(ctx.value);
         let initCodeKey: StateInit = self.calculateSharesKeyInit(msg.subject);
+/*
         let price: Int = self.getPrice(0, msg.initialSupply);
         let protocolFee: Int = price * self.protocolFeePercentage / 100;
         let subjectFee: Int = price * self.subjectFeePercentage / 100;
         require(ctx.value >= price + protocolFee + subjectFee + self.gasConsumption, "Insufficient funds");
+*/
         self.lastQueryId = self.lastQueryId + 1;
         self.queries.set(self.lastQueryId, Query{
-            givenSupply: 0,
+            supply: 0,
             subject: msg.subject,
             holder: msg.subject,
+            balance: 0,
             amount: msg.initialSupply,
             value: ctx.value,
-            increment: false
+            increment: true
         });
         send(SendParameters{
             to: contractAddress(initCodeKey),
             value: 0,
             bounce: true,
             mode: SendRemainingValue,
-            body: FirstKeys{
+            body: UpdateSupply{
                 queryId: self.lastQueryId,
-                supply: msg.initialSupply
+                amount: msg.initialSupply,
+                supply: 0,
+                increment: true
             }.toCell(),
             code: initCodeKey.code,
             data: initCodeKey.data
         });
     }
 
-    bounced(src: FirstKeys) {
-        // the message reverted, so we refund the sender
-        // TODO For some reason the compiler says:
-        // Type bounced<"FirstKeys"> does not have a field named "subject"
-        dump(src.queryId);
-        // self.send_funds(src.subject, src.remain);
+    bounced(src: UpdateSupply) {
+        // dump("Bounced UpdateSupply");
+        self.sendValueBackToUser(src.queryId);
+        self.queries.set(src.queryId, null);
     }
 
-    receive(msg: FirstKeys) {
-        dump("Shares:FirstKeys");
+    receive(msg: SupplyUpdated) {
+        // dump("Receiving SupplyUpdated");
         let ctx: Context = context();
-        dump(ctx.value);
+        // dump(ctx.value);
         let subject: Address = newAddress(0, 0);
-        dump("What the fuck");
+        let holder: Address = newAddress(0, 0);
+        let supply: Int = 0;
+        let balance: Int = 0;
+        let amount: Int = 0;
+        let increment: Bool = false;
+        // dump("What the fuck");
         if (self.queries.get(msg.queryId) != null) {
             subject = (self.queries.get(msg.queryId)!!).subject;
+            holder = (self.queries.get(msg.queryId)!!).holder;
+            balance = (self.queries.get(msg.queryId)!!).balance;
+            supply = (self.queries.get(msg.queryId)!!).supply;
+            amount = (self.queries.get(msg.queryId)!!).amount;
+            increment = (self.queries.get(msg.queryId)!!).increment;
         }
+        // dump("balance supply amount");
+        // dump(balance);
+        // dump(supply);
+        // dump(amount);
         let initCodeKey: StateInit = self.calculateSharesKeyInit(subject);
         require(ctx.sender == contractAddress(initCodeKey), "Invalid sender");
-        let initCodeWallet: StateInit = self.calculateSharesWalletInit(subject, subject);
+        let initCodeWallet: StateInit = self.calculateSharesWalletInit(holder, subject);
         send(SendParameters{
             to: contractAddress(initCodeWallet),
             value: 0,
             bounce: true,
             body: UpdateBalance{
                 queryId: msg.queryId,
-                amount: msg.supply,
-                increment: true
+                amount: amount,
+                holder: holder,
+                balance: balance,
+                increment: increment
             }.toCell(),
             mode: SendRemainingValue,
             code: initCodeWallet.code,
             data: initCodeWallet.data
         });
-        dump("Wallet deployed");
+        // dump("Wallet deployed");
     }
 
-    receive(msg: UpdateBalance) {
-        dump("Shares:UpdateBalance");
-        dump(context().value);
-        let givenSupply: Int = 0;
+
+    bounced(src: bounced<UpdateBalance>) {
+        // dump("Bounced UpdateBalance");
+        // TODO we should revert the previous change in the supply
+        self.sendValueBackToUser(src.queryId);
+        self.queries.set(src.queryId, null);
+    }
+
+    receive(msg: BalanceUpdated) {
+        // dump("Receiving BalanceUpdated");
+        // dump(context().value);
+        let supply: Int = 0;
+        let amount: Int = 0;
         let subject: Address = newAddress(0, 0);
-        dump("What the fuck");
+        let holder: Address = newAddress(0, 0);
+        let increment: Bool = false;
+        // dump("What the fuck");
         if (self.queries.get(msg.queryId) != null) {
-            dump("Not null");
-            givenSupply = (self.queries.get(msg.queryId)!!).givenSupply;
-            dump(givenSupply);
+            // dump("Not null");
+            supply = (self.queries.get(msg.queryId)!!).supply;
+            // dump(supply);
             subject = (self.queries.get(msg.queryId)!!).subject;
+            holder  = (self.queries.get(msg.queryId)!!).holder;
+            amount = (self.queries.get(msg.queryId)!!).amount;
+            increment = (self.queries.get(msg.queryId)!!).increment;
         } else {
-            dump("Query not found");
+            // dump("Query not found");
             require(false, "Query not found");
         }
-        let price: Int = self.getPrice(givenSupply, msg.amount);
-        dump(price);
+        let price: Int = 0;
+        if (increment) {
+            price = self.getPrice(supply, amount);
+        } else {
+            price = self.getPrice(supply - amount, amount);
+        }
         let protocolFee: Int = price * self.protocolFeePercentage / 100;
         let subjectFee: Int = price * self.subjectFeePercentage / 100;
-        self.send_funds(self.feeDestination, protocolFee);
-        self.send_funds(subject, subjectFee);
-        dump("Final balance");
-        dump(myBalance());
+        if (increment) {
+            self.send_funds(self.feeDestination, protocolFee);
+            self.send_funds(subject, subjectFee);
+        } else {
+            self.send_funds(holder, price - protocolFee - subjectFee);
+            self.send_funds(self.feeDestination, protocolFee);
+            self.send_funds(subject, subjectFee);
+        }
+        // dump("Final balance");
+        // dump(myBalance());
+        self.queries.set(msg.queryId, null);
     }
 
 
@@ -180,51 +223,69 @@ contract Shares with Deployable {
 
     // trading
 
-    /*
     receive(msg: TradeKey) {
-            let ctx: Context = context();
-            let initCodeKey: StateInit = self.calculateSharesKeyInit(msg.subject);
-            require(ctx.sender == msg.holder, "Invalid sender");
-            if (msg.supply == 0) {
-                // first key
-                require(msg.holder == msg.subject, "Not the subject");
-            }
-            let newSupply: Int = msg.supply;
-            if (msg.increment) {
-            // buying shares
-                newSupply = msg.supply + msg.amount;
-            } else {
-            // selling shares
-                if (msg.holder == msg.subject) {
-                    require(msg.amount < msg.supply, "Subject cannot sell last key");
-                } else {
-                    require(msg.amount <= msg.balance, "Insufficient balance");
-                }
-                newSupply = msg.supply - msg.amount;
-            }
-            self.lastQueryId = self.lastQueryId + 1;
-            self.queries.set(self.lastQueryId, Query{
-                supply: msg.supply,
-                subject: msg.subject,
-                holder: msg.subject,
-                amount: msg.supply,
-                value: ctx.value,
-                increment: msg.increment
-            });
-            send(SendParameters{
-                to: contractAddress(initCodeKey),
-                value: 0,
-                bounce: true,
-                mode: SendRemainingValue + SendIgnoreErrors,
-                body: UpdateSupply{
-                    queryId: self.lastQueryId,
-                    subject: msg.subject,
-                    supply: msg.supply,
-                    newSupply: newSupply
-                }.toCell()
-            });
+        // dump("Receiving TradeKey");
+        let ctx: Context = context();
+        let initCodeKey: StateInit = self.calculateSharesKeyInit(msg.subject);
+        require(ctx.sender == msg.holder, "Invalid sender");
+        if (msg.supply == 0) {
+            // first key
+            require(msg.holder == msg.subject, "Not the subject");
         }
-*/
+        // dump("// dump amount balance supply");
+        // dump(msg.amount);
+        // dump(msg.balance);
+        // dump(msg.supply);
+        // dump("increment");
+        // dump(msg.increment);
+        if (!msg.increment) {
+        // selling shares
+            if (msg.holder == msg.subject) {
+                require(msg.amount < msg.supply, "Subject cannot sell last key");
+            } else {
+                require(msg.amount <= msg.balance, "Insufficient balance");
+            }
+        }
+        // dump("// dump 3");
+
+        self.lastQueryId = self.lastQueryId + 1;
+        self.queries.set(self.lastQueryId, Query{
+            supply: msg.supply,
+            subject: msg.subject,
+            holder: msg.holder,
+            balance: msg.balance,
+            amount: msg.amount,
+            value: ctx.value,
+            increment: msg.increment
+        });
+        // dump(beginCell().storeAddress(msg.subject).endCell().hash());
+        // dump(beginCell().storeAddress(msg.holder).endCell().hash());
+
+        send(SendParameters{
+            to: contractAddress(initCodeKey),
+            value: 0,
+            bounce: true,
+            mode: SendRemainingValue,
+            body: UpdateSupply{
+                queryId: self.lastQueryId,
+                supply: msg.supply,
+                amount: msg.amount,
+                increment: msg.increment
+            }.toCell()
+        });
+        // dump("Key called");
+    }
+
+
+    inline fun sendValueBackToUser(queryId: Int) {
+        let value: Int = 0;
+        let subject: Address = newAddress(0, 0);
+        if (self.queries.get(queryId) != null) {
+            value = (self.queries.get(queryId)!!).value;
+            subject = (self.queries.get(queryId)!!).subject;
+        }
+        self.send_funds(subject, value - self.gasConsumption);
+    }
 
     inline fun send_funds(address: Address, amount: Int) {
         send(SendParameters{
