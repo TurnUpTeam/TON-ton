@@ -20,6 +20,10 @@ message SupplyUpdated {
     queryId: Int as uint64;
 }
 
+// message FixSupply {}
+
+// message SupplyFixed {}
+
 contract SharesKey with Deployable {
 
     // TODO tune the following constants
@@ -63,6 +67,8 @@ contract SharesKey with Deployable {
         });
         // dump("Sent");
     }
+
+    // receive(msg: FixSupply) {}
 
     inline fun estimateRestValue(): Int {
         let balance: Int = myBalance();

@@ -30,11 +30,6 @@ message TradeKey {
     increment: Bool;
 }
 
-message QueryFailed {
-    queryId: Int as uint64;
-    reason: String;
-}
-
 struct Query {
     supply: Int as uint16;
     subject: Address;
@@ -173,18 +168,18 @@ contract Shares with Deployable {
         // dump("Wallet deployed");
     }
 
-
     bounced(src: bounced<UpdateBalance>) {
-        // dump("Bounced UpdateBalance");
-        // TODO we should revert the previous change in the supply
-        self.sendValueBackToUser(src.queryId);
-        // It should not delete the query and add some logic to revert the supply change
-        // self.queries.set(src.queryId, null);
-        // emit an event that says that this queryId failed
-        emit(QueryFailed{
-            queryId: src.queryId,
-            reason: "Supply must be reverted"
-        }.toCell());
+    // dump("Bounced UpdateBalance");
+    // TODO we have to revert the previous change in the supply
+    // Call SharesKey >> FixSupply
+    }
+
+    // bounced(src: FixSupply) {}
+
+    // receive(msg: SupplyFixed) {
+
+      // self.sendValueBackToUser(src.queryId);
+      // self.queries.set(src.queryId, null);
     }
 
     receive(msg: BalanceUpdated) {
