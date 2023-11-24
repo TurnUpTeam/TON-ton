@@ -30,6 +30,11 @@ message TradeKey {
     increment: Bool;
 }
 
+message QueryFailed {
+    queryId: Int as uint64;
+    reason: String;
+}
+
 struct Query {
     supply: Int as uint16;
     subject: Address;
@@ -173,7 +178,13 @@ contract Shares with Deployable {
         // dump("Bounced UpdateBalance");
         // TODO we should revert the previous change in the supply
         self.sendValueBackToUser(src.queryId);
-        self.queries.set(src.queryId, null);
+        // It should not delete the query and add some logic to revert the supply change
+        // self.queries.set(src.queryId, null);
+        // emit an event that says that this queryId failed
+        emit(QueryFailed{
+            queryId: src.queryId,
+            reason: "Supply must be reverted"
+        }.toCell());
     }
 
     receive(msg: BalanceUpdated) {
@@ -284,7 +295,7 @@ contract Shares with Deployable {
             value = (self.queries.get(queryId)!!).value;
             subject = (self.queries.get(queryId)!!).subject;
         }
-        if (value) {
+        if (value > 0) {
             // TODO This should be improved keeping only the used gas
             self.send_funds(subject, value - self.gasConsumption);
         }
