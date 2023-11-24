@@ -20,9 +20,19 @@ message SupplyUpdated {
     queryId: Int as uint64;
 }
 
-// message FixSupply {}
+message FixSupply {
+    queryId: Int as uint64;
+    supply: Int as uint16;
+    amount: Int as uint16;
+    increment: Bool;
+}
 
-// message SupplyFixed {}
+message SupplyFixed {
+    queryId: Int as uint64;
+    supply: Int as uint16;
+    amount: Int as uint16;
+    increment: Bool;
+}
 
 contract SharesKey with Deployable {
 
@@ -68,7 +78,26 @@ contract SharesKey with Deployable {
         // dump("Sent");
     }
 
-    // receive(msg: FixSupply) {}
+    receive(msg: FixSupply) {
+        require(context().sender == self.sharesContract, "Forbidden");
+        if (!msg.increment) {
+            self.supply = self.supply + msg.amount;
+        } else {
+            self.supply = self.supply - msg.amount;
+        }
+        send(SendParameters{
+            to: self.sharesContract,
+            value: 0,
+            bounce: false,
+            mode: SendPayGasSeparately,
+            body: SupplyFixed{
+                queryId: msg.queryId,
+                amount: msg.amount,
+                supply: msg.supply,
+                increment: msg.increment
+            }.toCell()
+        });
+    }
 
     inline fun estimateRestValue(): Int {
         let balance: Int = myBalance();

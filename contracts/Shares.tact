@@ -171,16 +171,36 @@ contract Shares with Deployable {
     bounced(src: bounced<UpdateBalance>) {
     // dump("Bounced UpdateBalance");
     // TODO we have to revert the previous change in the supply
-    // Call SharesKey >> FixSupply
+    let subject: Address = newAddress(0, 0);
+    let amount: Int = 0;
+     let supply: Int = 0;
+     let increment: Bool = false;
+        if (self.queries.get(src.queryId) != null) {
+            amount = (self.queries.get(src.queryId)!!).amount;
+            subject = (self.queries.get(src.queryId)!!).subject;
+            supply = (self.queries.get(src.queryId)!!).supply;
+            increment = (self.queries.get(src.queryId)!!).increment;
+        }
+         let initCodeKey: StateInit = self.calculateSharesKeyInit(subject);
+            send(SendParameters{
+            to: contractAddress(initCodeKey),
+            value: 0,
+            bounce: true,
+            body: FixSupply{
+                queryId: src.queryId,
+                amount: amount,
+                supply: supply,
+                increment: increment
+            }.toCell()          
+        });
     }
 
     // bounced(src: FixSupply) {}
 
-    // receive(msg: SupplyFixed) {
-
-      // self.sendValueBackToUser(src.queryId);
-      // self.queries.set(src.queryId, null);
-    // }
+    receive(msg: SupplyFixed) {
+      self.sendValueBackToUser(msg.queryId);
+      self.queries.set(msg.queryId, null);
+    }
 
     receive(msg: BalanceUpdated) {
         // dump("Receiving BalanceUpdated");
@@ -223,8 +243,6 @@ contract Shares with Deployable {
         // dump(myBalance());
         self.queries.set(msg.queryId, null);
     }
-
-
 
 
     // trading
