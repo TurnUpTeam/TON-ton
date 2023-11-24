@@ -284,7 +284,9 @@ contract Shares with Deployable {
             value = (self.queries.get(queryId)!!).value;
             subject = (self.queries.get(queryId)!!).subject;
         }
-        self.send_funds(subject, value - self.gasConsumption);
+        if (value) {
+            self.send_funds(subject, value - self.gasConsumption);
+        }
     }
 
     inline fun send_funds(address: Address, amount: Int) {
