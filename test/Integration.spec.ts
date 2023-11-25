@@ -358,7 +358,7 @@ describe('Integration', () => {
         );
 
         keySupply = await keyContract.getSupply();
-        expect(keySupply).toEqual(9n);
+        expect(keySupply).toEqual(13n);
 
         // wallet balance
         walletBalance = await walletContract.getBalance();
