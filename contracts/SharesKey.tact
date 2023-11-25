@@ -48,9 +48,6 @@ contract SharesKey with Deployable {
     }
 
     receive(msg: UpdateSupply) {
-        // dump("Receiving UpdateSupply");
-        // dump(msg.supply);
-        // dump(self.supply);
         require(context().sender == self.sharesContract, "Forbidden");
         require(msg.supply == self.supply, "Supply mismatch");
         if (msg.increment) {
@@ -60,9 +57,6 @@ contract SharesKey with Deployable {
             self.supply = self.supply - msg.amount;
         }
         let remain: Int = self.estimateRestValue() - context().readForwardFee();
-        // dump("New supply");
-        // dump(self.supply);
-        // dump(remain);
         send(SendParameters{
             to: self.sharesContract,
             value: remain,
@@ -72,11 +66,9 @@ contract SharesKey with Deployable {
                 queryId: msg.queryId
             }.toCell()
         });
-        // dump("Sent");
     }
 
     receive(msg: FixSupply) {
-        dump("FixSupply");
         require(context().sender == self.sharesContract, "Forbidden");
         if (!msg.increment) {
             self.supply = self.supply + msg.amount;

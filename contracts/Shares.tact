@@ -119,22 +119,18 @@ contract Shares with Deployable {
     }
 
     bounced(src: UpdateSupply) {
-        // dump("Bounced UpdateSupply");
         self.sendValueBackToUser(src.queryId);
         self.queries.set(src.queryId, null);
     }
 
     receive(msg: SupplyUpdated) {
-        // dump("Receiving SupplyUpdated");
         let ctx: Context = context();
-        // dump(ctx.value);
         let subject: Address = newAddress(0, 0);
         let holder: Address = newAddress(0, 0);
         let supply: Int = 0;
         let balance: Int = 0;
         let amount: Int = 0;
         let increment: Bool = false;
-        // dump("What the fuck");
         if (self.queries.get(msg.queryId) != null) {
             subject = (self.queries.get(msg.queryId)!!).subject;
             holder = (self.queries.get(msg.queryId)!!).holder;
@@ -143,10 +139,6 @@ contract Shares with Deployable {
             amount = (self.queries.get(msg.queryId)!!).amount;
             increment = (self.queries.get(msg.queryId)!!).increment;
         }
-        // dump("balance supply amount");
-        // dump(balance);
-        // dump(supply);
-        // dump(amount);
         let initCodeKey: StateInit = self.calculateSharesKeyInit(subject);
         require(ctx.sender == contractAddress(initCodeKey), "Invalid sender");
         let initCodeWallet: StateInit = self.calculateSharesWalletInit(holder, subject);
@@ -165,27 +157,22 @@ contract Shares with Deployable {
             code: initCodeWallet.code,
             data: initCodeWallet.data
         });
-        // dump("Wallet deployed");
     }
 
     bounced(src: bounced<UpdateBalance>) {
-    dump("Bounced UpdateBalance");
     // TODO we have to revert the previous change in the supply
-    let subject: Address = newAddress(0, 0);
-    let amount: Int = 0;
-     let supply: Int = 0;
-     let increment: Bool = false;
+        let subject: Address = newAddress(0, 0);
+        let amount: Int = 0;
+        let supply: Int = 0;
+        let increment: Bool = false;
         if (self.queries.get(src.queryId) != null) {
             amount = (self.queries.get(src.queryId)!!).amount;
             subject = (self.queries.get(src.queryId)!!).subject;
             supply = (self.queries.get(src.queryId)!!).supply;
             increment = (self.queries.get(src.queryId)!!).increment;
         }
-         let initCodeKey: StateInit = self.calculateSharesKeyInit(subject);
-         dump(beginCell().storeAddress(subject).endCell().hash());
-         dump(amount);
-         dump(supply);
-            send(SendParameters{
+        let initCodeKey: StateInit = self.calculateSharesKeyInit(subject);
+        send(SendParameters{
             to: contractAddress(initCodeKey),
             value: 0,
             bounce: true,
@@ -194,36 +181,30 @@ contract Shares with Deployable {
                 amount: amount,
                 supply: supply,
                 increment: increment
-            }.toCell()          
-        }); 
+            }.toCell()
+        });
     }
 
     // bounced(src: FixSupply) {}
 
     receive(msg: SupplyFixed) {
-      self.sendValueBackToUser(msg.queryId);
-      self.queries.set(msg.queryId, null);
+        self.sendValueBackToUser(msg.queryId);
+        self.queries.set(msg.queryId, null);
     }
 
     receive(msg: BalanceUpdated) {
-        // dump("Receiving BalanceUpdated");
-        // dump(context().value);
         let supply: Int = 0;
         let amount: Int = 0;
         let subject: Address = newAddress(0, 0);
         let holder: Address = newAddress(0, 0);
         let increment: Bool = false;
-        // dump("What the fuck");
         if (self.queries.get(msg.queryId) != null) {
-            // dump("Not null");
             supply = (self.queries.get(msg.queryId)!!).supply;
-            // dump(supply);
             subject = (self.queries.get(msg.queryId)!!).subject;
             holder  = (self.queries.get(msg.queryId)!!).holder;
             amount = (self.queries.get(msg.queryId)!!).amount;
             increment = (self.queries.get(msg.queryId)!!).increment;
         } else {
-            // dump("Query not found");
             require(false, "Query not found");
         }
         let price: Int = 0;
@@ -242,8 +223,6 @@ contract Shares with Deployable {
             self.send_funds(self.feeDestination, protocolFee);
             self.send_funds(subject, subjectFee);
         }
-        // dump("Final balance");
-        // dump(myBalance());
         self.queries.set(msg.queryId, null);
     }
 
@@ -251,7 +230,6 @@ contract Shares with Deployable {
     // trading
 
     receive(msg: TradeKey) {
-        // dump("Receiving TradeKey");
         let ctx: Context = context();
         let initCodeKey: StateInit = self.calculateSharesKeyInit(msg.subject);
         require(ctx.sender == msg.holder, "Invalid sender");
@@ -259,12 +237,6 @@ contract Shares with Deployable {
             // first key
             require(msg.holder == msg.subject, "Not the subject");
         }
-        // dump("// dump amount balance supply");
-        // dump(msg.amount);
-        // dump(msg.balance);
-        // dump(msg.supply);
-        // dump("increment");
-        // dump(msg.increment);
         if (!msg.increment) {
         // selling shares
             if (msg.holder == msg.subject) {
@@ -273,7 +245,6 @@ contract Shares with Deployable {
                 require(msg.amount <= msg.balance, "Insufficient balance");
             }
         }
-        // dump("// dump 3");
 
         self.lastQueryId = self.lastQueryId + 1;
         self.queries.set(self.lastQueryId, Query{
@@ -285,8 +256,6 @@ contract Shares with Deployable {
             value: ctx.value,
             increment: msg.increment
         });
-        // dump(beginCell().storeAddress(msg.subject).endCell().hash());
-        // dump(beginCell().storeAddress(msg.holder).endCell().hash());
 
         send(SendParameters{
             to: contractAddress(initCodeKey),
@@ -300,8 +269,7 @@ contract Shares with Deployable {
                 increment: msg.increment
             }.toCell()
         });
-        // dump("Key called");
-    }
+            }
 
 
     inline fun sendValueBackToUser(queryId: Int) {
