@@ -169,7 +169,7 @@ contract Shares with Deployable {
     }
 
     bounced(src: bounced<UpdateBalance>) {
-    // dump("Bounced UpdateBalance");
+    dump("Bounced UpdateBalance");
     // TODO we have to revert the previous change in the supply
     let subject: Address = newAddress(0, 0);
     let amount: Int = 0;
@@ -182,6 +182,9 @@ contract Shares with Deployable {
             increment = (self.queries.get(src.queryId)!!).increment;
         }
          let initCodeKey: StateInit = self.calculateSharesKeyInit(subject);
+         dump(beginCell().storeAddress(subject).endCell().hash());
+         dump(amount);
+         dump(supply);
             send(SendParameters{
             to: contractAddress(initCodeKey),
             value: 0,
@@ -192,7 +195,7 @@ contract Shares with Deployable {
                 supply: supply,
                 increment: increment
             }.toCell()          
-        });
+        }); 
     }
 
     // bounced(src: FixSupply) {}

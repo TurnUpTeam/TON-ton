@@ -79,6 +79,7 @@ contract SharesKey with Deployable {
     }
 
     receive(msg: FixSupply) {
+        dump("FixSupply");
         require(context().sender == self.sharesContract, "Forbidden");
         if (!msg.increment) {
             self.supply = self.supply + msg.amount;
