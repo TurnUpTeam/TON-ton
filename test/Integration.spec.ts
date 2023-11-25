@@ -257,6 +257,115 @@ describe('Integration', () => {
 
     })
 
+    it("should revert if double trade request", async()=>{
+
+        let price = await shares.getGetPrice(0n, 3n);
+        let protocolFeePercentage = await shares.getGetFeePercentage();
+        let subjectFeePercentage = await shares.getGetSubjectFeePercentage();
+
+        const gasConsumption = await shares.getGetGasConsumption();
+
+        // @ts-ignore
+        let protocolFee = price * protocolFeePercentage / 100n;
+        // @ts-ignore
+        let subjectFee = price * subjectFeePercentage / 100n;
+
+        subject = await blockchain.treasury('subject');
+
+        newKeyMsg = {
+            $$type: 'NewKey',
+            subject: subject.address,
+            initialSupply: 3n,
+        };
+
+        await shares.send(
+            subject.getSender(),
+            {
+                value: price + protocolFee + subjectFee + gasConsumption,
+            },
+            newKeyMsg
+        );
+
+        holder = await blockchain.treasury('holder');
+
+        // buying 5 keys
+        tradeKeyMsg = {
+            $$type: 'TradeKey',
+            subject: subject.address,
+            supply: 3n,
+            holder: holder.address,
+            balance: 0n,
+            amount: 10n,
+            increment: true
+        };
+
+        const walletAddress = await shares.getGetWalletAddress(holder.address, subject.address);
+        const walletContract = blockchain.openContract(await SharesWallet.fromAddress(walletAddress));
+
+        try {
+            await walletContract.getBalance()
+        } catch(error) {
+            if (error instanceof Error) {
+                expect(error.message).toEqual('Trying to run get method on non-active contract');
+            }
+        }
+
+        price = await shares.getGetPrice(3n, 10n);
+        protocolFeePercentage = await shares.getGetFeePercentage();
+        subjectFeePercentage = await shares.getGetSubjectFeePercentage();
+
+        // @ts-ignore
+        protocolFee = price * protocolFeePercentage / 100n;
+        // @ts-ignore
+        subjectFee = price * subjectFeePercentage / 100n;
+
+        await shares.send(
+            holder.getSender(),
+            {
+                value: price + protocolFee + subjectFee + gasConsumption,
+            },
+            tradeKeyMsg
+        );
+
+        const keyAddress = await shares.getGetKeyAddress(subject.address);
+        const keyContract = blockchain.openContract(await SharesKey.fromAddress(keyAddress));
+        let keySupply = await keyContract.getSupply();
+        expect(keySupply).toEqual(13n);
+
+
+        let walletBalance = await walletContract.getBalance();
+        expect(walletBalance).toEqual(10n);
+
+
+        // selling 4 keys
+        tradeKeyMsg = {
+            $$type: 'TradeKey',
+            subject: subject.address,
+            supply: 13n,
+            holder: holder.address,
+            amount: 4n,
+            increment: false,
+            // a wrong balance
+            balance: 7n,
+        };
+
+        const result = await shares.send(
+            holder.getSender(),
+            {
+                value: gasConsumption,
+            },
+            tradeKeyMsg
+        );
+
+        keySupply = await keyContract.getSupply();
+        expect(keySupply).toEqual(9n);
+
+        // wallet balance
+        walletBalance = await walletContract.getBalance();
+        expect(walletBalance).toEqual(10n);
+
+    })
+
 
     it("should create allow holder to sell a key", async()=>{
 

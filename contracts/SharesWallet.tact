@@ -31,13 +31,7 @@ contract SharesWallet with Deployable {
     }
 
     receive(msg: UpdateBalance) {
-        // dump("SharesWallet:UpdateBalance");
         let ctx: Context = context();
-        // dump("Update balance");
-        // dump(self.balance);
-        // dump(msg.balance);
-        // dump(msg.amount);
-        // dump(msg.increment);
         require(sender() == self.sharesContract, "Forbidden");
         require(self.balance == msg.balance, "Balance mismatch");
         if (msg.increment) {
@@ -50,8 +44,6 @@ contract SharesWallet with Deployable {
             }
             self.balance = self.balance - msg.amount;
         }
-        // dump("balance after");
-        // dump(self.balance);
         let remain: Int = self.estimateRestValue() - context().readForwardFee();
         send(SendParameters{
             to: self.sharesContract,
