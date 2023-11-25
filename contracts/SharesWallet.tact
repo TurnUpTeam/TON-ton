@@ -38,8 +38,8 @@ contract SharesWallet with Deployable {
         // dump(msg.balance);
         // dump(msg.amount);
         // dump(msg.increment);
-
         require(sender() == self.sharesContract, "Forbidden");
+        require(self.balance == msg.balance, "Balance mismatch");
         if (msg.increment) {
             self.balance = self.balance + msg.amount;
         } else {
