@@ -174,7 +174,8 @@ contract Shares with Deployable {
         let initCodeKey: StateInit = self.calculateSharesKeyInit(subject);
         send(SendParameters{
             to: contractAddress(initCodeKey),
-            value: 0,
+            // we send the gas needed to revert the previous change in the supply
+            value: ton("0.2"),
             bounce: true,
             body: FixSupply{
                 queryId: src.queryId,
