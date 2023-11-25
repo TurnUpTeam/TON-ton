@@ -257,7 +257,7 @@ describe('Integration', () => {
 
     })
 
-    it.only("should revert holder to sell a key", async()=>{
+    it("should revert if double trade request", async()=>{
 
         let price = await shares.getGetPrice(0n, 3n);
         let protocolFeePercentage = await shares.getGetFeePercentage();
@@ -295,11 +295,22 @@ describe('Integration', () => {
             supply: 3n,
             holder: holder.address,
             balance: 0n,
-            amount: 5n,
+            amount: 10n,
             increment: true
         };
 
-        price = await shares.getGetPrice(3n, 5n);
+        const walletAddress = await shares.getGetWalletAddress(holder.address, subject.address);
+        const walletContract = blockchain.openContract(await SharesWallet.fromAddress(walletAddress));
+
+        try {
+            await walletContract.getBalance()
+        } catch(error) {
+            if (error instanceof Error) {
+                expect(error.message).toEqual('Trying to run get method on non-active contract');
+            }
+        }
+
+        price = await shares.getGetPrice(3n, 10n);
         protocolFeePercentage = await shares.getGetFeePercentage();
         subjectFeePercentage = await shares.getGetSubjectFeePercentage();
 
@@ -316,18 +327,27 @@ describe('Integration', () => {
             tradeKeyMsg
         );
 
+        const keyAddress = await shares.getGetKeyAddress(subject.address);
+        const keyContract = blockchain.openContract(await SharesKey.fromAddress(keyAddress));
+        let keySupply = await keyContract.getSupply();
+        expect(keySupply).toEqual(13n);
+
+
+        let walletBalance = await walletContract.getBalance();
+        expect(walletBalance).toEqual(10n);
+
+
         // selling 4 keys
         tradeKeyMsg = {
             $$type: 'TradeKey',
             subject: subject.address,
-            supply: 8n,
+            supply: 13n,
             holder: holder.address,
-            balance: 4n,
             amount: 4n,
-            increment: false
+            increment: false,
+            // a wrong balance
+            balance: 7n,
         };
-
-        // console.log("\n\n\n\n\n\n\n\n\n\n\n");
 
         const result = await shares.send(
             holder.getSender(),
@@ -337,26 +357,12 @@ describe('Integration', () => {
             tradeKeyMsg
         );
 
-        const keyAddress = await shares.getGetKeyAddress(subject.address);
-
-        // key supply
-
-        const keyContract = blockchain.openContract(await SharesKey.fromAddress(keyAddress));
-        const keySupply = await keyContract.getSupply();
-        expect(keySupply).toEqual(8n);
+        keySupply = await keyContract.getSupply();
+        expect(keySupply).toEqual(9n);
 
         // wallet balance
-        const walletAddress = await shares.getGetWalletAddress(holder.address, subject.address);
-        expect(result.transactions).toHaveTransaction({
-            from: shares.address,
-            to: walletAddress,
-            success: true
-        })
-
-        const walletContract = blockchain.openContract(await SharesWallet.fromAddress(walletAddress));
-
-        const walletBalance = await walletContract.getBalance();
-        expect(walletBalance).toEqual(5n);
+        walletBalance = await walletContract.getBalance();
+        expect(walletBalance).toEqual(10n);
 
     })
 
