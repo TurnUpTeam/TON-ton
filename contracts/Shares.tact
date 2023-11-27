@@ -175,7 +175,7 @@ contract Shares with Deployable {
         send(SendParameters{
             to: contractAddress(initCodeKey),
             // we send the gas needed to revert the previous change in the supply
-            value: ton("0.2"),
+            value: ton("0.02"),
             bounce: true,
             body: FixSupply{
                 queryId: src.queryId,
