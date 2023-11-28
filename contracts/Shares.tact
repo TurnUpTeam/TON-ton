@@ -189,6 +189,8 @@ contract Shares with Deployable {
     // bounced(src: FixSupply) {}
 
     receive(msg: SupplyFixed) {
+        dump("HERE");
+        dump(msg.queryId);
         self.sendValueBackToUser(msg.queryId);
         self.queries.set(msg.queryId, null);
     }
@@ -319,8 +321,16 @@ contract Shares with Deployable {
         return self.gasConsumption;
     }
 
-        get fun getLastQueryId(): Int {
+    get fun getLastQueryId(): Int {
         return self.lastQueryId;
+    }
+
+    get fun getQuery(queryId: Int): Int {
+    let supply: Int = 0;
+    if (self.queries.get(queryId) != null) {
+        supply = (self.queries.get(queryId)!!).supply;
+    }
+    return supply;
     }
 
     get fun getFeeDestination(): Address {

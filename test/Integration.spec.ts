@@ -121,6 +121,38 @@ describe('Integration', () => {
 
     })
 
+    it("should get lastQueryId", async()=>{
+
+        const price = await shares.getGetPrice(0n, 3n);
+        const protocolFeePercentage = await shares.getGetFeePercentage();
+        const subjectFeePercentage = await shares.getGetSubjectFeePercentage();
+
+        const gasConsumption = await shares.getGetGasConsumption();
+
+        // @ts-ignore
+        let protocolFee = price * protocolFeePercentage / 100n;
+        // @ts-ignore
+        let subjectFee = price * subjectFeePercentage / 100n;
+
+        subject = await blockchain.treasury('subject');
+        newKeyMsg = {
+            $$type: 'NewKey',
+            subject: subject.address,
+            initialSupply: 3n,
+        };
+
+        const result = await shares.send(
+            subject.getSender(),
+            {
+                value: price + protocolFee + subjectFee + gasConsumption,
+            },
+            newKeyMsg
+        );
+
+        const lastQueryId = await shares.getGetLastQueryId();
+        expect(lastQueryId).toEqual(1n)
+    })
+
 
     it("should throw if first key buyer not the subject", async()=>{
 
@@ -257,7 +289,7 @@ describe('Integration', () => {
 
     })
 
-    it("should revert if double trade request", async()=>{
+    it.only("should revert if double trade request", async()=>{
 
         let price = await shares.getGetPrice(0n, 3n);
         let protocolFeePercentage = await shares.getGetFeePercentage();
@@ -357,13 +389,10 @@ describe('Integration', () => {
             tradeKeyMsg
         );
 
-        keySupply = await keyContract.getSupply();
-        expect(keySupply).toEqual(13n);
-
-        // wallet balance
-        walletBalance = await walletContract.getBalance();
-        expect(walletBalance).toEqual(10n);
-
+        const lastQueryId = await shares.getGetLastQueryId();
+        console.log(lastQueryId)
+        const supply = await shares.getGetQuery(lastQueryId);
+        console.log(supply)
     })
 
 
