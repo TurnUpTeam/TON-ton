@@ -319,6 +319,10 @@ contract Shares with Deployable {
         return self.gasConsumption;
     }
 
+        get fun getLastQueryId(): Int {
+        return self.lastQueryId;
+    }
+
     get fun getFeeDestination(): Address {
         return self.feeDestination;
     }
