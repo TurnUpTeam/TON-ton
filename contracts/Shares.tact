@@ -195,10 +195,6 @@ contract Shares with Deployable {
         self.queries.set(msg.queryId, null);
         //it appears null
         dump((self.queries.get(msg.queryId)!!).supply);
-        //why does this not work
-        if (self.queries.get(msg.queryId) == null) {
-        dump("HERE");
-    }
     }
 
     receive(msg: BalanceUpdated) {
@@ -332,7 +328,9 @@ contract Shares with Deployable {
     }
 
     get fun getQueryExist(queryId: Int): Bool {
-    if (self.queries.get(queryId) != null) {
+    dump(queryId);
+    //why does this not work
+    if (self.queries.get(queryId) == null) {
         return true;
     }
     return false;
