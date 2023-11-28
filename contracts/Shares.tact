@@ -189,9 +189,9 @@ contract Shares with Deployable {
     // bounced(src: FixSupply) {}
 
     receive(msg: SupplyFixed) {
-        dump("HERE");
         dump(msg.queryId);
         self.sendValueBackToUser(msg.queryId);
+        //should turn the query null
         self.queries.set(msg.queryId, null);
     }
 
@@ -325,12 +325,11 @@ contract Shares with Deployable {
         return self.lastQueryId;
     }
 
-    get fun getQuery(queryId: Int): Int {
-    let supply: Int = 0;
+    get fun getQueryExist(queryId: Int): Bool {
     if (self.queries.get(queryId) != null) {
-        supply = (self.queries.get(queryId)!!).supply;
+        return true;
     }
-    return supply;
+    return false;
     }
 
     get fun getFeeDestination(): Address {

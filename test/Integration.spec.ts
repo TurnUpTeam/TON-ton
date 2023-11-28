@@ -391,8 +391,9 @@ describe('Integration', () => {
 
         const lastQueryId = await shares.getGetLastQueryId();
         console.log(lastQueryId)
-        const supply = await shares.getGetQuery(lastQueryId);
-        console.log(supply)
+        ///the query with that lastqueryId should be null
+        const exist = await shares.getGetQueryExist(lastQueryId);
+        console.log(exist)
     })
 
 
