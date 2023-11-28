@@ -175,7 +175,7 @@ contract Shares with Deployable {
         send(SendParameters{
             to: contractAddress(initCodeKey),
             // we send the gas needed to revert the previous change in the supply
-            value: ton("0.02"),
+            value: ton("0.04"),
             bounce: true,
             body: FixSupply{
                 queryId: src.queryId,
@@ -189,12 +189,8 @@ contract Shares with Deployable {
     // bounced(src: FixSupply) {}
 
     receive(msg: SupplyFixed) {
-        dump(msg.queryId);
         self.sendValueBackToUser(msg.queryId);
-        //should turn the query null
         self.queries.set(msg.queryId, null);
-        //it appears null
-        dump((self.queries.get(msg.queryId)!!).supply);
     }
 
     receive(msg: BalanceUpdated) {
@@ -328,12 +324,7 @@ contract Shares with Deployable {
     }
 
     get fun getQueryExist(queryId: Int): Bool {
-    dump(queryId);
-    //why does this not work
-    if (self.queries.get(queryId) == null) {
-        return true;
-    }
-    return false;
+    return (self.queries.get(queryId) != null);
     }
 
     get fun getFeeDestination(): Address {

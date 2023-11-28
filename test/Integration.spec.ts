@@ -289,7 +289,7 @@ describe('Integration', () => {
 
     })
 
-    it.only("should revert if double trade request", async()=>{
+    it("should revert if double trade request", async()=>{
 
         let price = await shares.getGetPrice(0n, 3n);
         let protocolFeePercentage = await shares.getGetFeePercentage();
@@ -390,10 +390,9 @@ describe('Integration', () => {
         );
 
         const lastQueryId = await shares.getGetLastQueryId();
-        console.log(lastQueryId)
-        ///testing to see if it made lastquery null
+        expect(lastQueryId).toEqual(3n);
         const exist = await shares.getGetQueryExist(lastQueryId);
-        console.log(exist)
+        expect(exist).toEqual(false);
     })
 
 
