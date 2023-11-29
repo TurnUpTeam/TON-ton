@@ -76,9 +76,10 @@ contract SharesKey with Deployable {
             require(msg.amount < self.supply, "Something wrong here");
             self.supply = self.supply - msg.amount;
         }
+         let remain: Int = self.estimateRestValue() - context().readForwardFee();
         send(SendParameters{
             to: self.sharesContract,
-            value: 0,
+            value: remain,
             bounce: false,
             mode: SendPayGasSeparately,
             body: SupplyFixed{

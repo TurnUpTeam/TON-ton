@@ -175,7 +175,7 @@ contract Shares with Deployable {
         send(SendParameters{
             to: contractAddress(initCodeKey),
             // we send the gas needed to revert the previous change in the supply
-            value: ton("0.2"),
+            value: ton("0.04"),
             bounce: true,
             body: FixSupply{
                 queryId: src.queryId,
@@ -317,6 +317,14 @@ contract Shares with Deployable {
 
     get fun getGasConsumption(): Int {
         return self.gasConsumption;
+    }
+
+    get fun getLastQueryId(): Int {
+        return self.lastQueryId;
+    }
+
+    get fun getQueryExist(queryId: Int): Bool {
+    return (self.queries.get(queryId) != null);
     }
 
     get fun getFeeDestination(): Address {
