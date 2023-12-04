@@ -97,12 +97,10 @@ contract Shares with Deployable {
         let ctx: Context = context();
         require(ctx.sender == msg.subject, "Invalid sender");
         let initCodeKey: StateInit = self.calculateSharesKeyInit(msg.subject);
-/*
         let price: Int = self.getPrice(0, msg.initialSupply);
         let protocolFee: Int = price * self.protocolFeePercentage / 100;
         let subjectFee: Int = price * self.subjectFeePercentage / 100;
         require(ctx.value >= price + protocolFee + subjectFee + self.gasConsumption, "Insufficient funds");
-*/
         self.lastQueryId = self.lastQueryId + 1;
         self.queries.set(self.lastQueryId, Query{
             supply: 0,
@@ -276,8 +274,19 @@ contract Shares with Deployable {
             // first key
             require(msg.holder == msg.subject, "Not the subject");
         }
-        if (!msg.increment) {
-        // selling shares
+        let price: Int = 0;
+        if (msg.increment) {
+            price = self.getPrice(msg.supply, msg.amount);
+        } else {
+            price = self.getPrice(msg.supply - msg.amount, msg.amount);
+        }
+        let protocolFee: Int = price * self.protocolFeePercentage / 100;
+        let subjectFee: Int = price * self.subjectFeePercentage / 100;
+        if (msg.increment) {
+            require(ctx.value >= price + protocolFee + subjectFee + self.gasConsumption, "Insufficient funds");
+        } else {
+            require(ctx.value >= self.gasConsumption, "Insufficient funds");
+            // selling shares
             if (msg.holder == msg.subject) {
                 require(msg.amount < msg.supply, "Subject cannot sell last key");
             } else {
