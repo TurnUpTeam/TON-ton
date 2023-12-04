@@ -30,6 +30,17 @@ message TradeKey {
     increment: Bool;
 }
 
+// Event emitted at the end of the execution
+message Trade {
+    success: Bool;
+    supply: Int as uint16;
+    subject: Address;
+    holder: Address;
+    balance: Int as uint16;
+    amount: Int as uint16;
+    increment: Bool;
+}
+
 struct Query {
     supply: Int as uint16;
     subject: Address;
@@ -120,7 +131,34 @@ contract Shares with Deployable {
 
     bounced(src: UpdateSupply) {
         self.sendValueBackToUser(src.queryId);
-        self.queries.set(src.queryId, null);
+        self.emitFinalEvent(src.queryId, false);
+    }
+
+    inline fun emitFinalEvent(queryId: Int, success: Bool) {
+        let subject: Address = newAddress(0, 0);
+        let holder: Address = newAddress(0, 0);
+        let supply: Int = 0;
+        let balance: Int = 0;
+        let amount: Int = 0;
+        let increment: Bool = false;
+        if (self.queries.get(queryId) != null) {
+            subject = (self.queries.get(queryId)!!).subject;
+            holder = (self.queries.get(queryId)!!).holder;
+            balance = (self.queries.get(queryId)!!).balance;
+            supply = (self.queries.get(queryId)!!).supply;
+            amount = (self.queries.get(queryId)!!).amount;
+            increment = (self.queries.get(queryId)!!).increment;
+        }
+        emit(Trade{
+            success: success,
+            supply: supply,
+            subject: subject,
+            holder: holder,
+            balance: balance,
+            amount: amount,
+            increment: increment
+        }.toCell());
+        self.queries.set(queryId, null);
     }
 
     receive(msg: SupplyUpdated) {
@@ -175,7 +213,7 @@ contract Shares with Deployable {
         send(SendParameters{
             to: contractAddress(initCodeKey),
             // we send the gas needed to revert the previous change in the supply
-            value: ton("0.04"),
+            value: ton("0.1"),
             bounce: true,
             body: FixSupply{
                 queryId: src.queryId,
@@ -190,7 +228,7 @@ contract Shares with Deployable {
 
     receive(msg: SupplyFixed) {
         self.sendValueBackToUser(msg.queryId);
-        self.queries.set(msg.queryId, null);
+        self.emitFinalEvent(msg.queryId, false);
     }
 
     receive(msg: BalanceUpdated) {
@@ -224,7 +262,7 @@ contract Shares with Deployable {
             self.send_funds(self.feeDestination, protocolFee);
             self.send_funds(subject, subjectFee);
         }
-        self.queries.set(msg.queryId, null);
+        self.emitFinalEvent(msg.queryId, true);
     }
 
 
