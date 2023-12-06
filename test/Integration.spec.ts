@@ -381,7 +381,7 @@ describe('Integration', () => {
             balance: 7n,
         };
 
-        const result = await shares.send(
+        await shares.send(
             holder.getSender(),
             {
                 value: gasConsumption,

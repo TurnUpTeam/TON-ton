@@ -30,6 +30,17 @@ message TradeKey {
     increment: Bool;
 }
 
+// Event emitted at the end of the execution
+message Trade {
+    success: Bool;
+    supply: Int as uint16;
+    subject: Address;
+    holder: Address;
+    balance: Int as uint16;
+    amount: Int as uint16;
+    increment: Bool;
+}
+
 struct Query {
     supply: Int as uint16;
     subject: Address;
@@ -86,12 +97,10 @@ contract Shares with Deployable {
         let ctx: Context = context();
         require(ctx.sender == msg.subject, "Invalid sender");
         let initCodeKey: StateInit = self.calculateSharesKeyInit(msg.subject);
-/*
         let price: Int = self.getPrice(0, msg.initialSupply);
         let protocolFee: Int = price * self.protocolFeePercentage / 100;
         let subjectFee: Int = price * self.subjectFeePercentage / 100;
         require(ctx.value >= price + protocolFee + subjectFee + self.gasConsumption, "Insufficient funds");
-*/
         self.lastQueryId = self.lastQueryId + 1;
         self.queries.set(self.lastQueryId, Query{
             supply: 0,
@@ -120,7 +129,34 @@ contract Shares with Deployable {
 
     bounced(src: UpdateSupply) {
         self.sendValueBackToUser(src.queryId);
-        self.queries.set(src.queryId, null);
+        self.emitFinalEvent(src.queryId, false);
+    }
+
+    inline fun emitFinalEvent(queryId: Int, success: Bool) {
+        let subject: Address = newAddress(0, 0);
+        let holder: Address = newAddress(0, 0);
+        let supply: Int = 0;
+        let balance: Int = 0;
+        let amount: Int = 0;
+        let increment: Bool = false;
+        if (self.queries.get(queryId) != null) {
+            subject = (self.queries.get(queryId)!!).subject;
+            holder = (self.queries.get(queryId)!!).holder;
+            balance = (self.queries.get(queryId)!!).balance;
+            supply = (self.queries.get(queryId)!!).supply;
+            amount = (self.queries.get(queryId)!!).amount;
+            increment = (self.queries.get(queryId)!!).increment;
+        }
+        emit(Trade{
+            success: success,
+            supply: supply,
+            subject: subject,
+            holder: holder,
+            balance: balance,
+            amount: amount,
+            increment: increment
+        }.toCell());
+        self.queries.set(queryId, null);
     }
 
     receive(msg: SupplyUpdated) {
@@ -175,7 +211,7 @@ contract Shares with Deployable {
         send(SendParameters{
             to: contractAddress(initCodeKey),
             // we send the gas needed to revert the previous change in the supply
-            value: ton("0.04"),
+            value: ton("0.06"),
             bounce: true,
             body: FixSupply{
                 queryId: src.queryId,
@@ -190,7 +226,7 @@ contract Shares with Deployable {
 
     receive(msg: SupplyFixed) {
         self.sendValueBackToUser(msg.queryId);
-        self.queries.set(msg.queryId, null);
+        self.emitFinalEvent(msg.queryId, false);
     }
 
     receive(msg: BalanceUpdated) {
@@ -224,7 +260,7 @@ contract Shares with Deployable {
             self.send_funds(self.feeDestination, protocolFee);
             self.send_funds(subject, subjectFee);
         }
-        self.queries.set(msg.queryId, null);
+        self.emitFinalEvent(msg.queryId, true);
     }
 
 
@@ -238,8 +274,19 @@ contract Shares with Deployable {
             // first key
             require(msg.holder == msg.subject, "Not the subject");
         }
-        if (!msg.increment) {
-        // selling shares
+        let price: Int = 0;
+        if (msg.increment) {
+            price = self.getPrice(msg.supply, msg.amount);
+        } else {
+            price = self.getPrice(msg.supply - msg.amount, msg.amount);
+        }
+        let protocolFee: Int = price * self.protocolFeePercentage / 100;
+        let subjectFee: Int = price * self.subjectFeePercentage / 100;
+        if (msg.increment) {
+            require(ctx.value >= price + protocolFee + subjectFee + self.gasConsumption, "Insufficient funds");
+        } else {
+            require(ctx.value >= self.gasConsumption, "Insufficient funds");
+            // selling shares
             if (msg.holder == msg.subject) {
                 require(msg.amount < msg.supply, "Subject cannot sell last key");
             } else {
