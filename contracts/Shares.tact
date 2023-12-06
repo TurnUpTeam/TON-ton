@@ -322,14 +322,14 @@ contract Shares with Deployable {
 
     inline fun sendValueBackToUser(queryId: Int) {
         let value: Int = 0;
-        let subject: Address = newAddress(0, 0);
+        let holder: Address = newAddress(0, 0);
         if (self.queries.get(queryId) != null) {
             value = (self.queries.get(queryId)!!).value;
-            subject = (self.queries.get(queryId)!!).subject;
+            holder = (self.queries.get(queryId)!!).holder;
         }
         if (value > 0) {
             // TODO This should be improved keeping only the used gas
-            self.send_funds(subject, value - self.gasConsumption);
+            self.send_funds(holder, value - self.gasConsumption);
         }
     }
 
