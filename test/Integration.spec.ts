@@ -289,7 +289,7 @@ describe('Integration', () => {
 
     })
 
-    it("should revert if double trade request", async()=>{
+    it.only("should revert if double trade request", async()=>{
 
         let price = await shares.getGetPrice(0n, 3n);
         let protocolFeePercentage = await shares.getGetFeePercentage();

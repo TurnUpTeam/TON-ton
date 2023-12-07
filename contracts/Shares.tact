@@ -133,6 +133,7 @@ contract Shares with Deployable {
     }
 
     inline fun emitFinalEvent(queryId: Int, success: Bool) {
+         dump("beggining emit");
         let subject: Address = newAddress(0, 0);
         let holder: Address = newAddress(0, 0);
         let supply: Int = 0;
@@ -147,6 +148,7 @@ contract Shares with Deployable {
             amount = (self.queries.get(queryId)!!).amount;
             increment = (self.queries.get(queryId)!!).increment;
         }
+        dump("before emit");
         emit(Trade{
             success: success,
             supply: supply,
@@ -156,6 +158,8 @@ contract Shares with Deployable {
             amount: amount,
             increment: increment
         }.toCell());
+        dump("emit");
+        dump(queryId);
         self.queries.set(queryId, null);
     }
 
@@ -211,7 +215,7 @@ contract Shares with Deployable {
         send(SendParameters{
             to: contractAddress(initCodeKey),
             // we send the gas needed to revert the previous change in the supply
-            value: ton("0.06"),
+            value: ton("0.09"),
             bounce: true,
             body: FixSupply{
                 queryId: src.queryId,
@@ -225,7 +229,10 @@ contract Shares with Deployable {
     // bounced(src: FixSupply) {}
 
     receive(msg: SupplyFixed) {
+        dump("fixed");
+        dump(msg.queryId);
         self.sendValueBackToUser(msg.queryId);
+        dump("here");
         self.emitFinalEvent(msg.queryId, false);
     }
 
@@ -321,16 +328,19 @@ contract Shares with Deployable {
 
 
     inline fun sendValueBackToUser(queryId: Int) {
+        dump("begin");
         let value: Int = 0;
         let holder: Address = newAddress(0, 0);
         if (self.queries.get(queryId) != null) {
             value = (self.queries.get(queryId)!!).value;
             holder = (self.queries.get(queryId)!!).holder;
         }
+         dump("middle");
         if (value > 0) {
             // TODO This should be improved keeping only the used gas
             self.send_funds(holder, value - self.gasConsumption);
         }
+         dump("end");
     }
 
     inline fun send_funds(address: Address, amount: Int) {

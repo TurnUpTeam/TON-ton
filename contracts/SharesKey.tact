@@ -2,6 +2,8 @@ import "@stdlib/deploy";
 
 import "./SharesWallet";
 
+import "./packages/utils/Estimatable";
+
 /*
 message SetInitialSupply {
     queryId: Int as uint64;
@@ -31,11 +33,7 @@ message SupplyFixed {
     queryId: Int as uint64;
 }
 
-contract SharesKey with Deployable {
-
-    // TODO tune the following constants
-    const minTonsForStorage: Int = ton("0.05");
-    const gasConsumption: Int = ton("0.05");
+contract SharesKey with Deployable, Estimatable {
 
     subject: Address;
     sharesContract: Address;
@@ -48,6 +46,7 @@ contract SharesKey with Deployable {
     }
 
     receive(msg: UpdateSupply) {
+        let ctx: Context = context();
         require(context().sender == self.sharesContract, "Forbidden");
         require(msg.supply == self.supply, "Supply mismatch");
         if (msg.increment) {
@@ -56,7 +55,7 @@ contract SharesKey with Deployable {
             require(msg.amount < self.supply, "Cannot sell last key");
             self.supply = self.supply - msg.amount;
         }
-        let remain: Int = self.estimateRestValue() - context().readForwardFee();
+        let remain: Int = self.estimate_rest_value(ctx) - ctx.readForwardFee();
         send(SendParameters{
             to: self.sharesContract,
             value: remain,
@@ -69,6 +68,7 @@ contract SharesKey with Deployable {
     }
 
     receive(msg: FixSupply) {
+        let ctx: Context = context();
         require(context().sender == self.sharesContract, "Forbidden");
         if (!msg.increment) {
             self.supply = self.supply + msg.amount;
@@ -76,7 +76,7 @@ contract SharesKey with Deployable {
             require(msg.amount < self.supply, "Something wrong here");
             self.supply = self.supply - msg.amount;
         }
-         let remain: Int = self.estimateRestValue() - context().readForwardFee();
+         let remain: Int = self.estimate_rest_value(ctx) - ctx.readForwardFee();
         send(SendParameters{
             to: self.sharesContract,
             value: remain,
@@ -86,12 +86,6 @@ contract SharesKey with Deployable {
                 queryId: msg.queryId
             }.toCell()
         });
-    }
-
-    inline fun estimateRestValue(): Int {
-        let balance: Int = myBalance();
-        let storageFee: Int = self.minTonsForStorage - min(balance, self.minTonsForStorage);
-        return balance - (storageFee + self.gasConsumption);
     }
 
     get fun supply(): Int {
